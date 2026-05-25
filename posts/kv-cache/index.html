@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<!-- saved from url=(0075)file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 全解:原理、优化与系统 — Bowen Su</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="./assets/css2" rel="stylesheet">
+<link rel="stylesheet" href="./assets/katex.min.css">
+<script defer="" src="./assets/katex.min.js"></script>
+<script defer="" src="./assets/auto-render.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#15191f; --ink2:#3c4650; --muted:#76818d; --faint:#a7b0ba;
+    --line:#e9ecef; --line2:#f1f3f5; --accent:#d6453f; --accent-soft:#fdeded;
+    --code-bg:#f6f8fa; --code-ink:#c7322c; --grid:#f4f6f8;
+    --maxw:720px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:"Inter","Noto Sans SC",system-ui,sans-serif;line-height:1.75;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--ink);color:#fff}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0;z-index:60}
+
+  /* 顶栏 */
+  .nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:980px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between}
+  .nav .site{font-family:"JetBrains Mono",monospace;font-size:12.5px;letter-spacing:.12em;color:var(--ink);font-weight:700}
+  .nav .site span{color:var(--accent)}
+  .nav .meta{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+
+  .layout{max-width:980px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:1fr 200px;gap:48px;align-items:start}
+  @media(max-width:920px){.layout{grid-template-columns:1fr;gap:0}.toc-side{display:none}}
+
+  article{max-width:var(--maxw);padding:54px 0 120px;min-width:0}
+
+  /* 文章头 */
+  .post-head{margin-bottom:46px}
+  .tagline{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:20px}
+  h1.title{font-family:"Inter","Noto Sans SC";font-weight:800;font-size:clamp(34px,6vw,52px);line-height:1.05;letter-spacing:-.03em;margin-bottom:22px}
+  .subtitle{font-family:"Newsreader",serif;font-style:italic;font-size:clamp(18px,2.4vw,22px);color:var(--ink2);line-height:1.5;margin-bottom:30px;max-width:60ch}
+  .byline{display:flex;align-items:center;gap:14px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .avatar{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#15191f,#3c4650);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Inter";font-weight:700;font-size:17px;flex-shrink:0;letter-spacing:.02em}
+  .byline .who{flex:1}
+  .byline .author{font-weight:600;font-size:15.5px;color:var(--ink)}
+  .byline .sub{font-size:13px;color:var(--muted);font-family:"JetBrains Mono",monospace;letter-spacing:.02em}
+  .byline .read{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--muted);text-align:right}
+
+  /* 正文排印 */
+  article p{font-size:17px;line-height:1.8;color:var(--ink2);margin:20px 0;max-width:68ch}
+  article p strong, article b{color:var(--ink);font-weight:600}
+  article em{font-style:italic;color:var(--ink2)}
+  .lede,.lede.drop{font-size:20px!important;line-height:1.65!important;color:var(--ink)!important;font-weight:400;margin:26px 0!important}
+  p.drop::first-letter{font-family:"Newsreader",serif;font-size:58px;float:left;line-height:.8;padding:8px 12px 0 0;color:var(--accent);font-weight:500}
+  /* section heading */
+  .sec{margin:64px 0 0;padding-top:30px;border-top:1px solid var(--line);scroll-margin-top:70px}
+  .sec .eyebrow{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+  .sec h2{font-family:"Inter","Noto Sans SC";font-size:clamp(26px,4vw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.12;margin-bottom:10px}
+  .sec .dek{font-family:"Newsreader",serif;font-style:italic;font-size:18px;color:var(--muted);margin-bottom:6px}
+  h3{font-family:"Noto Sans SC";font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);margin:42px 0 4px;padding-bottom:9px;border-bottom:2px solid var(--ink)}
+  h4{font-family:"Noto Sans SC";font-size:18px;font-weight:600;color:var(--ink);margin:28px 0 6px;letter-spacing:-.01em}
+  .quote{font-family:"Newsreader",serif;font-style:italic;font-size:22px;line-height:1.5;color:var(--ink);margin:30px 0;padding-left:22px;border-left:3px solid var(--accent);max-width:60ch}
+  article ul{list-style:none;margin:16px 0;padding:0;max-width:68ch}
+  article li{font-size:16.5px;line-height:1.7;color:var(--ink2);margin-bottom:13px;padding-left:26px;position:relative}
+  article li::before{content:"";position:absolute;left:2px;top:13px;width:8px;height:2px;background:var(--accent)}
+  article li b{color:var(--ink)}
+  code{font-family:"JetBrains Mono",monospace;font-size:14px;background:var(--code-bg);padding:2px 6px;border-radius:4px;color:var(--code-ink)}
+
+  .theorem{margin:26px 0;padding:2px 0 2px 22px;border-left:3px solid var(--ink);background:linear-gradient(90deg,var(--grid),transparent 60%)}
+  .theorem .tname{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0}
+  .theorem .katex{font-size:1.06em}
+  .theorem .note{font-size:14px;color:var(--muted);margin:12px 0;line-height:1.6;max-width:62ch}
+  .katex{color:var(--ink)}
+
+  .aside{margin:26px 0;padding:20px 24px;border-radius:12px;max-width:68ch}
+  .aside .al{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;display:block;margin-bottom:9px}
+  .aside.insight{background:var(--grid)} .aside.insight .al{color:var(--ink)}
+  .aside.pitfall{background:var(--accent-soft)} .aside.pitfall .al{color:var(--accent)}
+  .aside p{margin:0!important;font-size:15.5px!important;color:var(--ink2)!important}
+
+  .marginalia{display:grid;grid-template-columns:24px 1fr;gap:14px;margin:24px 0;max-width:60ch}
+  .marginalia .mk{font-family:"Newsreader",serif;font-size:22px;color:var(--accent);line-height:1}
+  .marginalia .mtext{font-family:"Newsreader",serif;font-style:italic;font-size:16px;line-height:1.55;color:var(--muted)}
+
+  .booktable{width:100%;border-collapse:collapse;margin:26px 0;font-size:15px}
+  .booktable caption{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:13px;text-align:left}
+  .booktable th{font-family:"Noto Sans SC";font-weight:600;font-size:13px;color:var(--ink);border-bottom:2px solid var(--ink);padding:10px 14px 10px 0;text-align:left}
+  .booktable td{border-bottom:1px solid var(--line);padding:11px 14px 11px 0;color:var(--ink2);line-height:1.5;vertical-align:top}
+  .booktable td:first-child{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink)}
+  .booktable code{font-size:12px;background:none;padding:0;color:var(--ink2)}
+  .booktable tr:hover td{background:var(--line2)}
+
+  .plate{margin:30px 0;padding:26px 22px 14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+  .plate svg{width:100%;height:auto;display:block}
+  .plate .fcap{font-size:13.5px;color:var(--muted);margin-top:16px;padding-top:13px;border-top:1px solid var(--line2)}
+  .plate .fcap b{color:var(--ink);font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin-right:8px}
+  svg .bl{font-family:"JetBrains Mono",monospace;font-size:11px;fill:var(--muted)}
+  svg .blb{font-family:"JetBrains Mono",monospace;font-size:11px;fill:var(--ink);font-weight:700}
+
+  .tradeoff{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:28px 0;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:68ch}
+  @media(max-width:560px){.tradeoff{grid-template-columns:1fr}}
+  .tradeoff div{padding:18px 20px;font-size:15px;line-height:1.6;color:var(--ink2);background:#fff}
+  .tradeoff h5{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}
+  .tradeoff .pro h5{color:var(--ink)} .tradeoff .con h5{color:var(--accent)}
+
+  .papers{margin:38px 0 0;padding-top:22px;border-top:1px solid var(--ink)}
+  .papers .ph{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:15px}
+  .papers .p{font-size:14.5px;color:var(--ink2);margin-bottom:10px;padding-left:22px;text-indent:-22px;line-height:1.5}
+  .papers .p b{color:var(--ink);font-weight:600} .papers .p span{color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:12px}
+
+  .end{margin-top:60px;padding-top:30px;border-top:1px solid var(--line)}
+  .end .sig{font-family:"Newsreader",serif;font-style:italic;font-size:18px;color:var(--ink)}
+  .end .sig b{font-style:normal;font-weight:600}
+  .end .dot{color:var(--accent);font-size:18px;letter-spacing:.4em;margin-top:14px}
+
+  /* 侧栏目录 */
+  .toc-side{position:sticky;top:80px;padding-top:54px;font-size:13.5px}
+  .toc-side .th{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:14px}
+  .toc-side a{display:block;color:var(--muted);text-decoration:none;padding:7px 0 7px 14px;border-left:2px solid var(--line);transition:.15s;line-height:1.35}
+  .toc-side a:hover{color:var(--ink);border-color:var(--muted)}
+  .toc-side a.active{color:var(--accent);border-color:var(--accent);font-weight:600}
+  .toc-side a .n{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--faint);margin-right:7px}
+</style>
+</head>
+<body>
+  <div class="progress" id="progress" style="width: 0%;"></div>
+  <nav class="nav"><div class="nav-in">
+    <div class="site">KV<span>·</span>CACHE</div>
+    <div class="meta">Bowen Su · 深度技术长文</div>
+  </div></nav>
+  <div class="layout">
+    <article id="article"><header class="post-head">
+      <div class="tagline">LLM 推理 · 深度长文</div>
+      <h1 class="title">KV Cache 全解:原理、优化与系统</h1>
+      <div class="subtitle">从自注意力的冗余计算,到一道主宰推理成本的显存公式,再到以 KV 为中心的服务架构 —— 把这条主线讲透。</div>
+      <div class="byline">
+        <div class="avatar">BS</div>
+        <div class="who"><div class="author">Bowen Su</div><div class="sub">2025 · 约 25 分钟阅读</div></div>
+        <div class="read">原理 · 数学<br>工程 · 系统</div>
+      </div>
+    </header><section class="sec" id="s1">
+  <div class="eyebrow">引子</div>
+  <h2>为何缓存,缓存何物</h2>
+  <div class="dek">从自回归生成的重复计算,到一道主宰推理成本的显存公式</div>
+  <p class="drop">大语言模型生成文本的方式是<b>自回归</b>的:模型一次只吐出一个 token,再将其接回输入,据以生成下一个。朴素地实现这一过程,意味着每生成一个新 token,都要把整段已有序列重新送入网络——第一百个 token 诞生时,前九十九个 token 的全部注意力都被重算一遍。计算量随生成长度呈平方级累积,绝大部分是冗余的。</p>
+  <p>症结的破解,藏在注意力机制的一个朴素事实里。每个 token 进入注意力层时,会被投影为三个向量:查询 <code>Q</code>、键 <code>K</code>、值 <code>V</code>。当前 token 用它的 <code>Q</code> 去和所有历史 token 的 <code>K</code> 做匹配,再据此加权聚合它们的 <code>V</code>。关键在于:<b>对一个已经处理过的 token,它的 K 与 V 是恒定的</b>——无论其后再接什么,都不会改变。</p>
+  <div class="marginalia"><div class="mk">§</div><div class="mtext">KV Cache 的全部精神,可凝为一句:已算之物,不再重算。它是一次以空间换时间的经典权衡。</div></div>
+  <p>于是有了 <b>KV Cache</b>:把每一层、每个已生成 token 的 K 与 V 缓存于显存。生成新 token 时,只需为它自己计算 Q、K、V,将新的 K、V 追加入缓存,再令其 Q 与缓存中全部 K、V 作注意力。每一步的代价,遂从"重处理整个序列"坍缩为"处理一个 token,外加一次查表"。</p>
+  <h3>那道主宰一切的公式</h3>
+  <p>天下无免费之事。这份加速的代价是显存。一个请求所占的 KV Cache,其字节数可精确写出:</p>
+  <div class="theorem"><div class="tname">定义 0.1 — KV Cache 显存占用</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mtext>Bytes</mtext><mo>=</mo><munder><munder><mn>2</mn><mo stretchy="true">⏟</mo></munder><mrow><mi>K</mi><mo separator="true">,</mo> <mi>V</mi></mrow></munder><mo>×</mo><mi>L</mi><mo>×</mo><mi>S</mi><mo>×</mo><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo>×</mo><msub><mi>d</mi><mrow><mi>h</mi><mi>e</mi><mi>a</mi><mi>d</mi></mrow></msub><mo>×</mo><mi>B</mi><mo>×</mo><mi>p</mi></mrow><annotation encoding="application/x-tex">\text{Bytes}=\underbrace{2}_{K,\,V}\times L\times S\times n_{kv}\times d_{head}\times B\times p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8778em; vertical-align: -0.1944em;"></span><span class="mord text"><span class="mord">Bytes</span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 2.1069em; vertical-align: -1.4624em;"></span><span class="mord munder"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.6444em;"><span class="" style="top: -1.6737em;"><span class="pstrut" style="height: 3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">K</span><span class="mpunct mtight">,</span><span class="mspace mtight" style="margin-right: 0.1952em;"></span><span class="mord mathnormal mtight" style="margin-right: 0.2222em;">V</span></span></span></span><span class="" style="top: -3em;"><span class="pstrut" style="height: 3em;"></span><span class="mord munder"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.6444em;"><span class="svg-align" style="top: -2.352em;"><span class="pstrut" style="height: 3em;"></span><span class="stretchy" style="height: 0.548em; min-width: 1.6em;"><span class="brace-left" style="height: 0.548em;"><svg width="400em" height="0.548em" viewBox="0 0 400000 548" preserveAspectRatio="xMinYMin slice"><path d="M0 6l6-6h17c12.688 0 19.313.3 20 1 4 4 7.313 8.3 10 13
+ 35.313 51.3 80.813 93.8 136.5 127.5 55.688 33.7 117.188 55.8 184.5 66.5.688
+ 0 2 .3 4 1 18.688 2.7 76 4.3 172 5h399450v120H429l-6-1c-124.688-8-235-61.7
+-331-161C60.687 138.7 32.312 99.3 7 54L0 41V6z"></path></svg></span><span class="brace-center" style="height: 0.548em;"><svg width="400em" height="0.548em" viewBox="0 0 400000 548" preserveAspectRatio="xMidYMin slice"><path d="M199572 214
+c100.7 8.3 195.3 44 280 108 55.3 42 101.7 93 139 153l9 14c2.7-4 5.7-8.7 9-14
+ 53.3-86.7 123.7-153 211-199 66.7-36 137.3-56.3 212-62h199568v120H200432c-178.3
+ 11.7-311.7 78.3-403 201-6 8-9.7 12-11 12-.7.7-6.7 1-18 1s-17.3-.3-18-1c-1.3 0
+-5-4-11-12-44.7-59.3-101.3-106.3-170-141s-145.3-54.3-229-60H0V214z"></path></svg></span><span class="brace-right" style="height: 0.548em;"><svg width="400em" height="0.548em" viewBox="0 0 400000 548" preserveAspectRatio="xMaxYMin slice"><path d="M399994 0l6 6v35l-6 11c-56 104-135.3 181.3-238 232-57.3
+ 28.7-117 45-179 50H-300V214h399897c43.3-7 81-15 113-26 100.7-33 179.7-91 237
+-174 2.7-5 6-9 10-13 .7-1 7.3-1 20-1h17z"></path></svg></span></span></span><span class="" style="top: -3em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.648em;"><span class=""></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 1.4624em;"><span class=""></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7667em; vertical-align: -0.0833em;"></span><span class="mord mathnormal">L</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7667em; vertical-align: -0.0833em;"></span><span class="mord mathnormal" style="margin-right: 0.0576em;">S</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7333em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.8444em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">d</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7667em; vertical-align: -0.0833em;"></span><span class="mord mathnormal" style="margin-right: 0.0502em;">B</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.625em; vertical-align: -0.1944em;"></span><span class="mord mathnormal">p</span></span></span></span></span></span>
+  <div class="note">L 层数,S 序列长度,n_kv 为 KV 头数,d_head 每头维度,B 批大小,p 每元素字节数。开头之 2,因 K 与 V 须分别存储。</div></div>
+  <p>这道公式是整篇文章的主线。<b>后面要讲的每一项技术,无非是在攻击其中某一个因子,或优化这批字节在存储层级中的安放方式。</b>它随序列长度与并发数线性膨胀;在长上下文之下,它甚至超过模型权重本身。</p>
+  <div class="aside insight"><span class="al">实例 · 让数字说话</span>取 Llama-2-7B(MHA):<i>L</i>=32,<i>n_head</i>=32,<i>d_head</i>=128,FP16(<i>p</i>=2)。单个 token 的缓存为 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo>×</mo><mn>32</mn><mo>×</mo><mn>32</mn><mo>×</mo><mn>128</mn><mo>×</mo><mn>2</mn><mo>=</mo><mn>1</mn> <mtext>MB</mtext></mrow><annotation encoding="application/x-tex">2\times32\times32\times128\times2=1\,\text{MB}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.7278em; vertical-align: -0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7278em; vertical-align: -0.0833em;"></span><span class="mord">32</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7278em; vertical-align: -0.0833em;"></span><span class="mord">32</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.7278em; vertical-align: -0.0833em;"></span><span class="mord">128</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 0.6833em;"></span><span class="mord">1</span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord text"><span class="mord">MB</span></span></span></span></span></span>。于是 4096 token 的上下文需 <b>约 4 GB</b>;当 batch=8,飙至 <b>32 GB</b>——已逼近乃至超过 7B 权重本身的约 14 GB。缓存,而非权重,成了长上下文服务的真正瓶颈。</div>
+  <h3>全文的地图</h3>
+  <p>面对这道公式,优化分作泾渭分明的两途。其一,<b>把缓存做小</b>:通过共享、压缩、降精度、或干脆少存,削减公式中的因子——此途多需改动模型结构。其二,<b>把缓存管好</b>:数据量不变,而优化其在显存中如何安放、如何跨请求复用、如何在存储层级间迁移——此途纯属推理引擎之事,不动模型分毫。</p>
+  <div class="marginalia"><div class="mk">❡</div><div class="mtext">左途偏"结构",右途偏"系统"。量化独立于二者之间。这一区分,亦回答了"KV Cache 是否模型的一部分"之问——见尾章。</div></div>
+  <div class="plate" style="margin-top:30px"><svg viewBox="0 0 720 430">
+    <!-- 根 -->
+    <rect x="290" y="12" width="140" height="42" rx="5" fill="none" stroke="#11161c" stroke-width="1.5"></rect>
+    <text x="360" y="32" text-anchor="middle" class="blb">KV Cache</text>
+    <text x="360" y="46" text-anchor="middle" class="bl">用显存换计算</text>
+    <!-- 根到两个分支头 -->
+    <line x1="360" y1="54" x2="360" y2="70" stroke="#11161c"></line>
+    <line x1="170" y1="70" x2="550" y2="70" stroke="#11161c"></line>
+    <line x1="170" y1="70" x2="170" y2="86" stroke="#11161c"></line>
+    <line x1="550" y1="70" x2="550" y2="86" stroke="#11161c"></line>
+    <!-- 分支头(底部 132) -->
+    <rect x="60" y="86" width="220" height="46" rx="5" fill="#f3f5f7" stroke="#11161c"></rect>
+    <text x="170" y="106" text-anchor="middle" class="blb">一 · 把缓存做小</text>
+    <text x="170" y="122" text-anchor="middle" class="bl" style="fill:#e5484d">改结构 / 改数据</text>
+    <rect x="440" y="86" width="220" height="46" rx="5" fill="#f3f5f7" stroke="#11161c"></rect>
+    <text x="550" y="106" text-anchor="middle" class="blb">二 · 把缓存管好</text>
+    <text x="550" y="122" text-anchor="middle" class="bl" style="fill:#e5484d">改放置 / 改调度</text>
+    <!-- 主干竖线:自分支头底 132 向下至最后一框中心 -->
+    <line x1="80" y1="132" x2="80" y2="338" stroke="#cbb"></line>
+    <line x1="640" y1="132" x2="640" y2="338" stroke="#cbb"></line>
+    <!-- 左列三框:中心 168/238/308,框高48 → 顶144 不压分支头(底132) -->
+    
+      <line x1="80" y1="168" x2="100" y2="168" stroke="#cbb"></line>
+      <rect x="100" y="144" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="118" y="164" class="blb">共享 · 压缩 K、V</text>
+      <text x="118" y="182" class="bl">MQA · GQA · MLA</text>
+      <line x1="80" y1="238" x2="100" y2="238" stroke="#cbb"></line>
+      <rect x="100" y="214" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="118" y="234" class="blb">量化降精度</text>
+      <text x="118" y="252" class="bl">INT8 · FP8 · INT4</text>
+      <line x1="80" y1="308" x2="100" y2="308" stroke="#cbb"></line>
+      <rect x="100" y="284" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="118" y="304" class="blb">少存 token</text>
+      <text x="118" y="322" class="bl">窗口 · Streaming · H2O</text>
+    <!-- 右列三框 -->
+    
+      <line x1="620" y1="168" x2="640" y2="168" stroke="#cbb"></line>
+      <rect x="420" y="144" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="438" y="164" class="blb">分页管理显存</text>
+      <text x="438" y="182" class="bl">PagedAttention</text>
+      <line x1="620" y1="238" x2="640" y2="238" stroke="#cbb"></line>
+      <rect x="420" y="214" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="438" y="234" class="blb">跨请求复用</text>
+      <text x="438" y="252" class="bl">前缀缓存 · RadixTree</text>
+      <line x1="620" y1="308" x2="640" y2="308" stroke="#cbb"></line>
+      <rect x="420" y="284" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="438" y="304" class="blb">卸载 · 调度</text>
+      <text x="438" y="322" class="bl">分级卸载 · PD 分离</text>
+    <!-- 脚注:最后框底 332,线在 360 -->
+    <line x1="40" y1="362" x2="680" y2="362" stroke="#e7eaee"></line>
+    <text x="40" y="384" class="bl">左途三类:改模型,需重训,质量有取舍 ── 三/四选一</text>
+    <text x="40" y="404" class="bl">右途三类:纯引擎,不动模型,输出不变 ── 可叠加全开 · 量化居中可乘性叠加</text>
+  </svg><div class="fcap"><b>图 0.2</b>技术全景知识地图 ── 一根、两途、六类</div></div>
+  <div class="plate"><svg viewBox="0 0 720 280">
+    <text x="40" y="24" class="bl">显存 =  L · S · n<tspan baseline-shift="sub" font-size="8">kv</tspan>·d · B · p   ——   攻击其中可变的三项</text>
+    <line x1="40" y1="40" x2="680" y2="40" stroke="#e7eaee"></line>
+    
+      <rect x="40" y="58" width="180" height="44" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect>
+      <text x="130" y="78" text-anchor="middle" class="blb" style="fill:#e5484d">缩 S</text>
+      <text x="130" y="94" text-anchor="middle" class="bl">序列长度</text>
+      <line x1="130" y1="102" x2="130" y2="128" stroke="#11161c"></line>
+      <rect x="40" y="128" width="180" height="50" rx="4" fill="#fff" stroke="#11161c"></rect>
+      <text x="130" y="149" text-anchor="middle" class="blb">少存 token</text>
+      <text x="130" y="167" text-anchor="middle" class="bl">窗口 · Streaming · H2O</text>
+      <rect x="280" y="58" width="180" height="44" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect>
+      <text x="370" y="78" text-anchor="middle" class="blb" style="fill:#e5484d">缩 n<tspan baseline-shift="sub" font-size="9">kv</tspan>·d</text>
+      <text x="370" y="94" text-anchor="middle" class="bl">KV 头数</text>
+      <line x1="370" y1="102" x2="370" y2="128" stroke="#11161c"></line>
+      <rect x="280" y="128" width="180" height="50" rx="4" fill="#fff" stroke="#11161c"></rect>
+      <text x="370" y="149" text-anchor="middle" class="blb">共享 / 压缩</text>
+      <text x="370" y="167" text-anchor="middle" class="bl">MQA · GQA · MLA</text>
+      <rect x="520" y="58" width="180" height="44" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect>
+      <text x="610" y="78" text-anchor="middle" class="blb" style="fill:#e5484d">缩 p</text>
+      <text x="610" y="94" text-anchor="middle" class="bl">数值精度</text>
+      <line x1="610" y1="102" x2="610" y2="128" stroke="#11161c"></line>
+      <rect x="520" y="128" width="180" height="50" rx="4" fill="#fff" stroke="#11161c"></rect>
+      <text x="610" y="149" text-anchor="middle" class="blb">量化</text>
+      <text x="610" y="167" text-anchor="middle" class="bl">INT8 · FP8 · INT4</text>
+    <line x1="40" y1="206" x2="680" y2="206" stroke="#e7eaee"></line>
+    <text x="40" y="228" class="bl">系统层(分页 / 前缀 / 卸载)不缩任何因子 ── 故不在此图 ── 只优化字节如何安放与复用</text>
+    <text x="40" y="250" class="bl" style="fill:#7b8794">L(层)与 B(批)一般不在缓存层优化:前者固定,后者由系统调度</text>
+  </svg><div class="fcap"><b>图 0.3</b>显存公式归因 ── 每项技术攻击哪个因子</div></div>
+  <p>下面分两大部分展开:前三节讲"做小",后三节讲"管好",每节都能单独读。我们先从缓存里最庞大的那一维——头数——讲起。</p>
+</section><section class="sec" id="s2">
+      <div class="eyebrow">SECTION 01</div>
+      <h2>共享与压缩 K、V</h2>
+      <div class="dek">MQA · GQA · MLA —— 向 KV 头数 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span> 开刀</div>
+      <div class="quote">与其每个注意力头都存一份 K、V,不如让它们共享。</div><div class="plate"><svg viewBox="0 0 560 165"><text x="70" y="16" text-anchor="middle" class="blb">MHA</text><text x="215" y="16" text-anchor="middle" class="blb">GQA(2组)</text><text x="370" y="16" text-anchor="middle" class="blb">MQA</text><text x="490" y="16" text-anchor="middle" class="blb">MLA</text>
+    <g><rect x="36" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="36" y="66" width="15" height="15" rx="2" fill="#7a3b2e"></rect><line x1="43" y1="49" x2="43" y2="66" stroke="#cbbb9c"></line><rect x="56" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="56" y="66" width="15" height="15" rx="2" fill="#7a3b2e"></rect><line x1="63" y1="49" x2="63" y2="66" stroke="#cbbb9c"></line><rect x="76" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="76" y="66" width="15" height="15" rx="2" fill="#7a3b2e"></rect><line x1="83" y1="49" x2="83" y2="66" stroke="#cbbb9c"></line><rect x="96" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="96" y="66" width="15" height="15" rx="2" fill="#7a3b2e"></rect><line x1="103" y1="49" x2="103" y2="66" stroke="#cbbb9c"></line><text x="70" y="100" text-anchor="middle" class="bl">4 头·4 组KV</text></g>
+    <g><rect x="165" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="185" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="205" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="225" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="173" y="66" width="15" height="15" rx="2" fill="#3d5a45"></rect><rect x="213" y="66" width="15" height="15" rx="2" fill="#3d5a45"></rect><line x1="172" y1="49" x2="180" y2="66" stroke="#cbbb9c"></line><line x1="192" y1="49" x2="180" y2="66" stroke="#cbbb9c"></line><line x1="212" y1="49" x2="220" y2="66" stroke="#cbbb9c"></line><line x1="232" y1="49" x2="220" y2="66" stroke="#cbbb9c"></line><text x="215" y="100" text-anchor="middle" class="bl">4 头·2 组KV</text></g>
+    <g><rect x="325" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="345" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="365" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="385" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="355" y="66" width="15" height="15" rx="2" fill="#9a7b3f"></rect><line x1="332" y1="49" x2="362" y2="66" stroke="#cbbb9c"></line><line x1="352" y1="49" x2="362" y2="66" stroke="#cbbb9c"></line><line x1="372" y1="49" x2="362" y2="66" stroke="#cbbb9c"></line><line x1="392" y1="49" x2="362" y2="66" stroke="#cbbb9c"></line><text x="370" y="100" text-anchor="middle" class="bl">4 头·1 组KV</text></g>
+    <g><rect x="455" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="475" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="495" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="515" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"></rect><rect x="481" y="66" width="22" height="15" rx="2" fill="#3d5a45"></rect><line x1="462" y1="49" x2="492" y2="66" stroke="#cbbb9c"></line><line x1="482" y1="49" x2="492" y2="66" stroke="#cbbb9c"></line><line x1="502" y1="49" x2="492" y2="66" stroke="#cbbb9c"></line><line x1="522" y1="49" x2="492" y2="66" stroke="#cbbb9c"></line><text x="492" y="100" text-anchor="middle" class="bl">潜向量 c</text></g>
+    <text x="280" y="130" text-anchor="middle" class="bl">上排 = Query 头   下排 = 需缓存的 K/V   ——   由左至右愈省</text>
+    <text x="280" y="150" text-anchor="middle" class="bl" style="fill:#9a7b3f;font-style:italic">缓存量 ∝ 下排方块数</text></svg><div class="fcap"><b>图 1.1</b>由 MHA 至 MLA,需缓存的 K/V 组数递减</div></div>
+  <p class="drop">显存公式中,随头数线性增长的 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo>⋅</mo><msub><mi>d</mi><mrow><mi>h</mi><mi>e</mi><mi>a</mi><mi>d</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}\cdot d_{head}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5945em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.8444em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">d</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span> 一项,往往是缓存里最肥厚的一维。标准多头注意力(MHA)令每个注意力头各执一组独立的 K、V;这一节的三种技术,皆在追问同一件事:这些头,能否共用更少的 K、V?</p>
+  <h3>四种方案,只在 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span> 上分野</h3>
+  <p>设 Query 头总数为 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi></mrow><annotation encoding="application/x-tex">h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6944em;"></span><span class="mord mathnormal">h</span></span></span></span></span>。MHA、GQA、MQA、MLA 的全部差异,可压缩进一张表——它们对缓存的影响,完全由 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span> 决定。</p>
+  <table class="booktable"><caption>表 1.1 — 四种注意力变体的缓存对比</caption>
+  <tbody><tr><th>方案</th><th><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span></th><th>相对 MHA 缓存</th><th>代表模型</th></tr>
+  <tr><td>MHA</td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi></mrow><annotation encoding="application/x-tex">h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6944em;"></span><span class="mord mathnormal">h</span></span></span></span></span></td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>×</mo></mrow><annotation encoding="application/x-tex">1\times</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.7278em; vertical-align: -0.0833em;"></span><span class="mord">1</span><span class="mord">×</span></span></span></span></span></td><td>GPT-3,早期 LLaMA</td></tr>
+  <tr><td>GQA</td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi></mrow><annotation encoding="application/x-tex">g</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.625em; vertical-align: -0.1944em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">g</span></span></span></span></span>(组数)</td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi><mi mathvariant="normal">/</mi><mi>h</mi></mrow><annotation encoding="application/x-tex">g/h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">g</span><span class="mord">/</span><span class="mord mathnormal">h</span></span></span></span></span></td><td>Llama 2/3 70B,Qwen2</td></tr>
+  <tr><td>MQA</td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn></mrow><annotation encoding="application/x-tex">1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6444em;"></span><span class="mord">1</span></span></span></span></span></td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><mi>h</mi></mrow><annotation encoding="application/x-tex">1/h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord">1/</span><span class="mord mathnormal">h</span></span></span></span></span></td><td>PaLM,Falcon</td></tr>
+  <tr><td>MLA</td><td>潜维 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>c</mi></msub></mrow><annotation encoding="application/x-tex">d_c</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8444em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.1514em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span></td><td><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>≈</mo><msub><mi>d</mi><mi>c</mi></msub><mi mathvariant="normal">/</mi><mo stretchy="false">(</mo><mi>h</mi> <msub><mi>d</mi><mrow><mi>h</mi><mi>e</mi><mi>a</mi><mi>d</mi></mrow></msub><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\approx d_c/(h\,d_{head})</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.4831em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.1514em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mord">/</span><span class="mopen">(</span><span class="mord mathnormal">h</span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">d</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mclose">)</span></span></span></span></span></td><td>DeepSeek-V2/V3</td></tr></tbody></table>
+  <h3>何以独惠解码?——算术强度之辩</h3>
+  <p>欲明此类技术之价值,须辨 prefill 与 decode 之别。解码阶段每步仅生成一个 token,其计算量微乎其微,却须将<b>整个 KV Cache 自显存读出</b>方能作注意力。其<b>算术强度</b>(每字节访存所摊的浮点运算)极低,是彻底的访存受限(memory-bound)。</p>
+  <div class="theorem"><div class="tname">命题 1.1 — 解码受限于带宽</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>t</mi><mtext>decode-step</mtext></msub><mo>≈</mo><mfrac><mtext>KV&nbsp;Cache&nbsp;字节数</mtext><mtext>显存带宽</mtext></mfrac></mrow><annotation encoding="application/x-tex">t_{\text{decode-step}}\approx\frac{\text{KV Cache 字节数}}{\text{显存带宽}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.9012em; vertical-align: -0.2861em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">decode-step</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.2861em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 2.0574em; vertical-align: -0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.3714em;"><span class="" style="top: -2.314em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord text"><span class="mord cjk_fallback">显存带宽</span></span></span></span><span class="" style="top: -3.23em;"><span class="pstrut" style="height: 3em;"></span><span class="frac-line" style="border-bottom-width: 0.04em;"></span></span><span class="" style="top: -3.677em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord text"><span class="mord">KV&nbsp;Cache&nbsp;</span><span class="mord cjk_fallback">字节数</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.686em;"><span class=""></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></span>
+  <div class="note">解码每步耗时近似正比于缓存大小。故缓存缩小 4×,解码吞吐可近似提升至 4×——收益源于"少搬字节",而非"少算"。</div></div>
+  <div class="aside insight"><span class="al">洞见</span>这解释了一个常令初学者困惑之事:GQA 几乎不减少 FLOPs,为何却能大幅加速?因为它压根不在算力上较劲,而在每一步解码须搬运的字节数上。瓶颈被挪走了。</div>
+  <h3>三法详陈</h3>
+  <h4>MQA — 极简的共享</h4>
+  <p>Shazeer 于 2019 年提出。所有 Query 头共享<b>同一组</b> K、V,<span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">n_{kv}=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 0.6444em;"></span><span class="mord">1</span></span></span></span></span>。缓存压至 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><mi>h</mi></mrow><annotation encoding="application/x-tex">1/h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord">1/</span><span class="mord mathnormal">h</span></span></span></span></span>,最为彻底。代价是表达力的明显折损——在大模型上,质量下降可被感知。</p>
+  <h4>GQA — 折中,且可低成本迁移</h4>
+  <p>Ainslie 等于 2023 年提出。将 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>h</mi></mrow><annotation encoding="application/x-tex">h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6944em;"></span><span class="mord mathnormal">h</span></span></span></span></span> 个头分作 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi></mrow><annotation encoding="application/x-tex">g</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.625em; vertical-align: -0.1944em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">g</span></span></span></span></span> 组,组内共享一组 K、V,介于 MHA(<span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi><mo lspace="0em" rspace="0em">=</mo><mi>h</mi></mrow><annotation encoding="application/x-tex">g{=}h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8889em; vertical-align: -0.1944em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">g</span><span class="mord"><span class="mrel">=</span></span><span class="mord mathnormal">h</span></span></span></span></span>)与 MQA(<span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi><mo lspace="0em" rspace="0em">=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">g{=}1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8389em; vertical-align: -0.1944em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">g</span><span class="mord"><span class="mrel">=</span></span><span class="mord">1</span></span></span></span></span>)之间。其真正的工程价值,在于一项迁移之术:</p>
+  <div class="aside insight"><span class="al">洞见 · Uptraining</span>已训成的 MHA 模型,可将同组各头的 K/V 投影做<b>均值池化</b>以初始化 GQA,再以约原预训练 <b>5%</b> 的算力继续训练,质量即可基本恢复。这使 GQA 近乎零成本落地,遂成今日开源模型之标配。</div>
+  <h4>MLA — 低秩压缩的潜向量</h4>
+  <p>DeepSeek-V2 之创制。它不走共享之路,而行<b>低秩压缩</b>:将每个 token 投影为一个低维潜向量 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo>∈</mo><msup><mi mathvariant="double-struck">R</mi><msub><mi>d</mi><mi>c</mi></msub></msup></mrow><annotation encoding="application/x-tex">c_{kv}\in\mathbb{R}^{d_c}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6891em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 0.8491em;"></span><span class="mord"><span class="mord mathbb">R</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8491em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.1645em;"><span class="" style="top: -2.357em; margin-left: 0em; margin-right: 0.0714em;"><span class="pstrut" style="height: 2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.143em;"><span class=""></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>(其中 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>c</mi></msub><mo>≪</mo><mi>h</mi> <msub><mi>d</mi><mrow><mi>h</mi><mi>e</mi><mi>a</mi><mi>d</mi></mrow></msub></mrow><annotation encoding="application/x-tex">d_c\ll h\,d_{head}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8444em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.1514em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">≪</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 0.8444em; vertical-align: -0.15em;"></span><span class="mord mathnormal">h</span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">d</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span>)存入缓存,作注意力时再以上投影矩阵还原各头的 K、V。</p>
+  <div class="theorem"><div class="tname">式 1.2 — MLA 的压缩与还原</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo>=</mo><msup><mi>W</mi><mrow><mi>D</mi><mi>K</mi><mi>V</mi></mrow></msup><msub><mi>h</mi><mi>t</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msup><mi>k</mi><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></msup><mo>=</mo><msubsup><mi>W</mi><mi>i</mi><mrow><mi>U</mi><mi>K</mi></mrow></msubsup><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub><mo separator="true">,</mo><mspace width="1em"></mspace><msup><mi>v</mi><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></msup><mo>=</mo><msubsup><mi>W</mi><mi>i</mi><mrow><mi>U</mi><mi>V</mi></mrow></msubsup><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">c_{kv}=W^{DKV}h_t,\qquad k^{(i)}=W^{UK}_i c_{kv},\quad v^{(i)}=W^{UV}_i c_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.1324em; vertical-align: -0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8913em;"><span class="" style="top: -3.113em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">DK</span><span class="mord mathnormal mtight" style="margin-right: 0.2222em;">V</span></span></span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">h</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.2806em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right: 2em;"></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0315em;">k</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.938em;"><span class="" style="top: -3.113em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mopen mtight">(</span><span class="mord mathnormal mtight">i</span><span class="mclose mtight">)</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.185em; vertical-align: -0.247em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.8913em;"><span class="" style="top: -2.453em; margin-left: -0.1389em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span><span class="" style="top: -3.113em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">K</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.247em;"><span class=""></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right: 1em;"></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0359em;">v</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.938em;"><span class="" style="top: -3.113em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mopen mtight">(</span><span class="mord mathnormal mtight">i</span><span class="mclose mtight">)</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.1383em; vertical-align: -0.247em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.8913em;"><span class="" style="top: -2.453em; margin-left: -0.1389em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span><span class="" style="top: -3.113em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.2222em;">V</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.247em;"><span class=""></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span></span>
+  <div class="note">仅缓存低维 c_kv,而非 h 组高维 K/V。上投影矩阵 W^{UK}、W^{UV} 可被吸收进相邻权重,推理时几乎不增算力。</div></div>
+  <div class="aside pitfall"><span class="al">陷阱 · 解耦 RoPE</span>低秩压缩与旋转位置编码(RoPE)不可交换——RoPE 须作用于真正的 K,而 MLA 缓存的是压缩前的 c_kv,二者无法直接相容。DeepSeek 之解,谓之 <b>decoupled RoPE</b>:额外辟出一小束专司位置的维度,与压缩部分解耦并行。此乃 MLA 实现中最易疏漏之处。</div>
+  <h3>矩阵吸收:MLA 不增算力的玄机</h3>
+  <p>读者或疑:还原 K、V 既需上投影,岂不徒增计算?玄机在于<b>矩阵吸收</b>。注意力中 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>q</mi><mi mathvariant="normal">⊤</mi></msup><mi>k</mi><mo>=</mo><msup><mi>q</mi><mi mathvariant="normal">⊤</mi></msup><msup><mi>W</mi><mrow><mi>U</mi><mi>K</mi></mrow></msup><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">q^\top k = q^\top W^{UK} c_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1.0435em; vertical-align: -0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0359em;">q</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8491em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mord mathnormal" style="margin-right: 0.0315em;">k</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.0435em; vertical-align: -0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0359em;">q</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8491em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">K</span></span></span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span>,可将 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>W</mi><mrow><mi>U</mi><mi>K</mi></mrow></msup></mrow><annotation encoding="application/x-tex">W^{UK}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8413em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">K</span></span></span></span></span></span></span></span></span></span></span></span></span> 预先并入 Query 投影 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>W</mi><mi>Q</mi></msup></mrow><annotation encoding="application/x-tex">W^Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8413em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">Q</span></span></span></span></span></span></span></span></span></span></span></span>,令 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mover accent="true"><mi>W</mi><mo>~</mo></mover><mi>Q</mi></msup><mo>=</mo><mo stretchy="false">(</mo><msup><mi>W</mi><mrow><mi>U</mi><mi>K</mi></mrow></msup><msup><mo stretchy="false">)</mo><mi mathvariant="normal">⊤</mi></msup><msup><mi>W</mi><mi>Q</mi></msup></mrow><annotation encoding="application/x-tex">\tilde W^Q = (W^{UK})^\top W^Q</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.9202em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.9202em;"><span class="" style="top: -3em;"><span class="pstrut" style="height: 3em;"></span><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span></span><span class="" style="top: -3.6023em;"><span class="pstrut" style="height: 3em;"></span><span class="accent-body" style="left: -0.25em;"><span class="mord">~</span></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">Q</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.0991em; vertical-align: -0.25em;"></span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.0715em;">K</span></span></span></span></span></span></span></span></span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8491em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">Q</span></span></span></span></span></span></span></span></span></span></span></span>;输出端 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>W</mi><mrow><mi>U</mi><mi>V</mi></mrow></msup></mrow><annotation encoding="application/x-tex">W^{UV}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.8413em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.1389em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.8413em;"><span class="" style="top: -3.063em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.109em;">U</span><span class="mord mathnormal mtight" style="margin-right: 0.2222em;">V</span></span></span></span></span></span></span></span></span></span></span></span></span> 同理可并入输出投影。如此,上投影从未在运行时显式发生,缓存却始终只是那一个小小的 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>c</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">c_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span>。</p>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>缓存随 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>k</mi><mi>v</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{kv}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.5806em; vertical-align: -0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0315em;">k</span><span class="mord mathnormal mtight" style="margin-right: 0.0359em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span></span></span></span></span> 线性下降:GQA-8 组约为基线 1/4,MQA 约 1/h,MLA 更低;且 DeepSeek 实测质量不降反升。</div><div class="con"><h5>所偿者</h5>共享愈烈,表达力损失愈显;MLA 实现繁复(解耦 RoPE、矩阵吸收);且皆须于训练期采用,不可对既有权重即插即用——GQA 的 uptraining 是唯一低成本旁门。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Fast Transformer Decoding: One Write-Head is All You Need</b> · <span>Shazeer, 2019</span></div>
+  <div class="p"><b>GQA: Training Generalized Multi-Query Transformer Models from MHA Checkpoints</b> · <span>Ainslie et al., 2023</span></div>
+  <div class="p"><b>DeepSeek-V2: A Strong, Economical, and Efficient MoE LM</b> · <span>DeepSeek-AI, 2024</span></div></div>
+</section><section class="sec" id="s3">
+      <div class="eyebrow">SECTION 02</div>
+      <h2>量化降精度</h2>
+      <div class="dek">向 precision 一项开刀 —— 与结构正交的乘性优化</div>
+      <div class="quote">十六位浮点存的本就不是精确值,那为何不用更少的位?</div><div class="plate"><svg viewBox="0 0 560 130"><text x="40" y="22" class="blb">FP16</text><rect x="100" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="110" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="120" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="130" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="140" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="150" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="160" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="170" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="180" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="190" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="200" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="210" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="220" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="230" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="240" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><rect x="250" y="12" width="8" height="15" rx="1" fill="#7a3b2e"></rect><text x="280" y="23" class="bl">16 bit/数 · 基线</text>
+    <text x="40" y="62" class="blb">INT8</text><rect x="100" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="110" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="120" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="130" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="140" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="150" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="160" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><rect x="170" y="52" width="8" height="15" rx="1" fill="#9a7b3f"></rect><text x="195" y="63" class="bl">8 bit · ÷2</text>
+    <text x="40" y="102" class="blb">INT4</text><rect x="100" y="92" width="8" height="15" rx="1" fill="#3d5a45"></rect><rect x="110" y="92" width="8" height="15" rx="1" fill="#3d5a45"></rect><rect x="120" y="92" width="8" height="15" rx="1" fill="#3d5a45"></rect><rect x="130" y="92" width="8" height="15" rx="1" fill="#3d5a45"></rect><text x="155" y="103" class="bl">4 bit · ÷4(需校准离群值)</text></svg><div class="fcap"><b>图 2.1</b>位宽愈低,单个数值占用愈少</div></div>
+  <p class="drop">前一章削的是缓存里 K、V 的<b>数量</b>;这一节削的是每个数值的<b>位宽</b>。量化将 K、V 从 FP16/BF16 的十六位,映射至 INT8、FP8 乃至 INT4。它直击公式中的 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.625em; vertical-align: -0.1944em;"></span><span class="mord mathnormal">p</span></span></span></span></span> 项,且因其作用于"每个数",故能<b>乘性地</b>叠加于任意结构(GQA、MLA)之上——这是它最可贵的品性。</p>
+  <h3>量化的基本算术</h3>
+  <p>以非对称整数量化为例,将浮点张量 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.4306em;"></span><span class="mord mathnormal">x</span></span></span></span></span> 映射至 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>b</mi></mrow><annotation encoding="application/x-tex">b</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6944em;"></span><span class="mord mathnormal">b</span></span></span></span></span> 位整数:</p>
+  <div class="theorem"><div class="tname">式 2.1 — 仿射量化</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>s</mi><mo>=</mo><mfrac><mrow><mi>max</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>−</mo><mi>min</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></mrow><mrow><msup><mn>2</mn><mi>b</mi></msup><mo>−</mo><mn>1</mn></mrow></mfrac><mo separator="true">,</mo><mspace width="1em"></mspace><mi>z</mi><mo>=</mo><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">⌊</mo><mo>−</mo><mfrac><mrow><mi>min</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo></mrow><mi>s</mi></mfrac><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">⌉</mo><mo separator="true">,</mo><mspace width="1em"></mspace><mi>q</mi><mo>=</mo><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">⌊</mo><mfrac><mi>x</mi><mi>s</mi></mfrac><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">⌉</mo><mo>+</mo><mi>z</mi></mrow><annotation encoding="application/x-tex">s=\frac{\max(x)-\min(x)}{2^b-1},\quad z=\Big\lfloor-\frac{\min(x)}{s}\Big\rceil,\quad q=\Big\lfloor\frac{x}{s}\Big\rceil+z</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.4306em;"></span><span class="mord mathnormal">s</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 2.1963em; vertical-align: -0.7693em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.427em;"><span class="" style="top: -2.314em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height: 0.7751em;"><span class="" style="top: -2.989em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">b</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mord">1</span></span></span><span class="" style="top: -3.23em;"><span class="pstrut" style="height: 3em;"></span><span class="frac-line" style="border-bottom-width: 0.04em;"></span></span><span class="" style="top: -3.677em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mop">max</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mop">min</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.7693em;"><span class=""></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right: 1em;"></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord mathnormal" style="margin-right: 0.044em;">z</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.8em; vertical-align: -0.65em;"></span><span class="mord"><span class="delimsizing size2">⌊</span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 2.113em; vertical-align: -0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.427em;"><span class="" style="top: -2.314em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord mathnormal">s</span></span></span><span class="" style="top: -3.23em;"><span class="pstrut" style="height: 3em;"></span><span class="frac-line" style="border-bottom-width: 0.04em;"></span></span><span class="" style="top: -3.677em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mop">min</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.686em;"><span class=""></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord"><span class="delimsizing size2">⌉</span></span><span class="mpunct">,</span><span class="mspace" style="margin-right: 1em;"></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord mathnormal" style="margin-right: 0.0359em;">q</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.836em; vertical-align: -0.686em;"></span><span class="mord"><span class="delimsizing size2">⌊</span></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.1076em;"><span class="" style="top: -2.314em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord mathnormal">s</span></span></span><span class="" style="top: -3.23em;"><span class="pstrut" style="height: 3em;"></span><span class="frac-line" style="border-bottom-width: 0.04em;"></span></span><span class="" style="top: -3.677em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord mathnormal">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.686em;"><span class=""></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord"><span class="delimsizing size2">⌉</span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 0.4306em;"></span><span class="mord mathnormal" style="margin-right: 0.044em;">z</span></span></span></span></span></span>
+  <div class="note">s 为缩放因子,z 为零点。反量化 x̂ = s·(q − z)。对称量化则令 z = 0,牺牲一点范围利用率换取无零点的快路径。</div></div>
+  <h3>真正的难处:离群值</h3>
+  <p>KV Cache 量化远较权重量化棘手,根由在<b>离群值</b>:K、V 中少数通道的数值幅度远逾其余。若按整张量统一量化,这些离群值会把 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>s</mi></mrow><annotation encoding="application/x-tex">s</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.4306em;"></span><span class="mord mathnormal">s</span></span></span></span></span> 撑得极大,致使绝大多数寻常数值的有效位数被吞噬殆尽。量化的<b>粒度</b>遂成胜负手。</p>
+  <table class="booktable"><caption>表 2.1 — 量化粒度的权衡</caption>
+  <tbody><tr><th>粒度</th><th>一个 scale 所辖</th><th>抗离群</th><th>开销</th></tr>
+  <tr><td>per-tensor</td><td>整张量</td><td>最弱</td><td>最小</td></tr>
+  <tr><td>per-token</td><td>每 token 一组</td><td>中</td><td>小</td></tr>
+  <tr><td>per-channel</td><td>每通道一组</td><td>强</td><td>中</td></tr>
+  <tr><td>per-group</td><td>通道内再分小组</td><td>最强</td><td>较大</td></tr></tbody></table>
+  <div class="aside insight"><span class="al">洞见 · KIVI 之策</span>KIVI 的核心观察是:K 的离群值<b>固着于特定通道</b>,而 V 无此规律。故最优之策非一刀切,而是<b>K 按 per-channel、V 按 per-token</b> 分而治之。这一不对称处理,是高质量 2-bit KV 量化得以成立的关键。</div>
+  <h3>FP8 与 INT8:硬件的视角</h3>
+  <ul><li><b>INT8</b>:均匀量化,需 scale 与零点,对离群值敏感;然定点运算在旧硬件上更普及。</li>
+  <li><b>FP8</b>:有 <code>E4M3</code>(四位指数、三位尾数,范围窄而精度高)与 <code>E5M2</code>(范围宽而精度低)两式。浮点天然的非均匀分布更能从容容纳离群值;Hopper(H100)及其后世具原生 FP8 张量核,正使其成为推理之首选。</li></ul>
+  <div class="aside pitfall"><span class="al">陷阱 · 反量化的隐性开销</span>解码本是访存受限,量化减少搬运字节,本应提速;然每次注意力前,须将低位整数<b>反量化</b>回浮点。倘若此步未与注意力 kernel <b>融合(fused)</b>,额外的访存与转换反可吞掉全部收益。上乘的实现(如 FlashAttention 的量化变体)会将反量化压入 kernel 之内,与计算一气呵成。</div>
+  <p>量化亦是全文少数<b>既可于推理时施加、又可结合训练</b>的技术。正因如此,它在"改结构"与"改引擎"两途之间居中而立——这一点,尾章还将重提。</p>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>按位宽线性缩小:INT8 减半,INT4 减至四分之一。无需改动架构,推理时即可施加,且可叠加于 GQA、MLA 之上。</div><div class="con"><h5>所偿者</h5>精度损失随位宽递减而增;离群值须以细粒度驯服;反量化非经 kernel 融合则反受其累。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache</b> · <span>Liu et al., 2024</span></div>
+  <div class="p"><b>KVQuant: Towards 10 Million Context Length LLM Inference</b> · <span>Hooper et al., 2024</span></div></div>
+</section><section class="sec" id="s4">
+      <div class="eyebrow">SECTION 03</div>
+      <h2>少存 token</h2>
+      <div class="dek">缓存驱逐与稀疏 —— 把预算从 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>S</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(S)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathnormal" style="margin-right: 0.0278em;">O</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right: 0.0576em;">S</span><span class="mclose">)</span></span></span></span></span> 钉为 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathnormal" style="margin-right: 0.0278em;">O</span><span class="mopen">(</span><span class="mord">1</span><span class="mclose">)</span></span></span></span></span></div>
+      <div class="quote">序列再长,真正值得缓存的 token 其实没几个。</div><div class="plate"><svg viewBox="0 0 560 140"><text x="14" y="20" class="bl">纯滑动窗口 — 开头被挤出 → 注意力沉没失守 → 崩溃</text><rect x="14" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="30" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="46" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="62" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="78" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="94" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="110" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="126" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="142" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="158" y="30" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="174" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><rect x="190" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><rect x="206" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><rect x="222" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><rect x="238" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><rect x="254" y="30" width="13" height="16" rx="2" fill="#7a3b2e" stroke="#cbbb9c"></rect><text x="290" y="42" class="bl" style="fill:#7a3b2e">✕</text>
+    <text x="14" y="82" class="bl">StreamingLLM — 永久保留开头 sink 锚点 + 近期窗口</text><rect x="14" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="30" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="46" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="62" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="78" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="94" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="110" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="126" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="142" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="158" y="92" width="13" height="16" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="174" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="190" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="206" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="222" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="238" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="254" y="92" width="13" height="16" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><text x="290" y="104" class="bl" style="fill:#3d5a45">✓ 稳定</text>
+    <text x="14" y="132" class="bl" style="fill:#9a7b3f;font-style:italic">深色=保留于缓存 · 浅色=已驱逐 · H2O 则按累计注意力分数动态择"深色"</text></svg><div class="fcap"><b>图 3.1</b>保留开头 sink 锚点,方得流式稳定</div></div>
+  <p class="drop">前两章削的是每个 token 的占用;这一节削的是 token 的<b>数目</b>。其立论是:注意力本质稀疏,<b>少数 token 贡献了绝大部分注意力质量</b>。既如此,何不只缓存这少数,从而将缓存复杂度由 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mi>S</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(S)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathnormal" style="margin-right: 0.0278em;">O</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right: 0.0576em;">S</span><span class="mclose">)</span></span></span></span></span> 一举钉为固定预算 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathnormal" style="margin-right: 0.0278em;">O</span><span class="mopen">(</span><span class="mord">1</span><span class="mclose">)</span></span></span></span></span>?</p>
+  <h3>为何不能径直"只留最近 N 个"</h3>
+  <p>最朴素之法是纯滑动窗口,只保留最近的 N 个 token。然实践中,一旦最早的 token 被挤出缓存,模型质量便<b>断崖式崩塌</b>。StreamingLLM 给出了它的数学解释,根源在 softmax 的归一化约束:</p>
+  <div class="theorem"><div class="tname">式 3.1 — 注意力的归一化约束</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>i</mi></munderover><mi mathvariant="normal">softmax</mi><mo>⁡</mo> ⁣<mo fence="false" stretchy="true" minsize="1.2em" maxsize="1.2em">(</mo><msub><mi>q</mi><mi>i</mi></msub><mo>⋅</mo><msub><mi>k</mi><mi>j</mi></msub><mo fence="false" stretchy="true" minsize="1.2em" maxsize="1.2em">)</mo><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\sum_{j=1}^{i}\operatorname{softmax}\!\big(q_i\cdot k_j\big)=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 3.2254em; vertical-align: -1.4138em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.8117em;"><span class="" style="top: -1.8723em; margin-left: 0em;"><span class="pstrut" style="height: 3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0572em;">j</span><span class="mrel mtight">=</span><span class="mord mtight">1</span></span></span></span><span class="" style="top: -3.05em;"><span class="pstrut" style="height: 3.05em;"></span><span class=""><span class="mop op-symbol large-op">∑</span></span></span><span class="" style="top: -4.3em; margin-left: 0em;"><span class="pstrut" style="height: 3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">i</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 1.4138em;"><span class=""></span></span></span></span></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mop"><span class="mord mathrm">softmax</span></span><span class="mspace" style="margin-right: -0.1667em;"></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="delimsizing size1">(</span></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0359em;">q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3117em;"><span class="" style="top: -2.55em; margin-left: -0.0359em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 1.2em; vertical-align: -0.35em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right: 0.0315em;">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3117em;"><span class="" style="top: -2.55em; margin-left: -0.0315em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right: 0.0572em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.2861em;"><span class=""></span></span></span></span></span></span><span class="mord"><span class="delimsizing size1">)</span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 0.6444em;"></span><span class="mord">1</span></span></span></span></span></span>
+  <div class="note">注意力权重被强制求和为一。纵使当前 token 并无实质可关注之物,这部分"多余"的注意力也必须有所倾倒。</div></div>
+  <p>模型于是习得一桩诡计:把这些多余的注意力,固定倾倒于<b>序列最初的几个 token</b> 之上——是为 <b>attention sink(注意力沉没)</b>。这几个 token 内容上往往无足轻重,却充当了 softmax 的泄压之阀。一旦它们被驱逐,注意力分布被迫重组,模型遂崩。</p>
+  <h3>二法分陈</h3>
+  <ul><li><b>StreamingLLM</b> — 永久保留<b>开头四个 sink token,外加最近窗口</b>,中间尽弃。如此,模型可于近乎无限长的流式输入上稳定生成,而显存恒定。</li>
+  <li><b>H2O(Heavy-Hitter Oracle)</b> — 立基于"少数 heavy hitter 主导注意力"之察。为每个 token 维护一份<b>累计注意力分数</b> <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mo>∑</mo><mi>t</mi></msub><msub><mi>a</mi><mrow><mi>t</mi><mo separator="true">,</mo><mi>j</mi></mrow></msub></mrow><annotation encoding="application/x-tex">\sum_t a_{t,j}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1.0497em; vertical-align: -0.2997em;"></span><span class="mop"><span class="mop op-symbol small-op" style="position: relative; top: 0em;">∑</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.1308em;"><span class="" style="top: -2.4003em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.2997em;"><span class=""></span></span></span></span></span></span><span class="mspace" style="margin-right: 0.1667em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3117em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mpunct mtight">,</span><span class="mord mathnormal mtight" style="margin-right: 0.0572em;">j</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.2861em;"><span class=""></span></span></span></span></span></span></span></span></span></span>,缓存既满,贪心驱逐分数最低者,留 heavy hitter 与近期之 token。其择留乃<b>内容动态</b>所定,或为序列中部的某个题眼。</li></ul>
+  <div class="aside pitfall"><span class="al">陷阱 · 位置编码须重定</span>StreamingLLM 实现中最易错之处:缓存内的 token,须按其在<b>缓存中的相对位置</b>重新赋予位置编码,而非沿用其在原序列中的绝对位置。否则中间一段被驱逐后,位置序列出现空洞,位置编码错乱。</div>
+  <table class="booktable"><caption>表 3.1 — 四种少存策略</caption>
+  <tbody><tr><th>方法</th><th>择留依据</th><th>动态?</th><th>所长</th></tr>
+  <tr><td>滑动窗口</td><td>纯位置(最近)</td><td>否</td><td>局部任务</td></tr>
+  <tr><td>StreamingLLM</td><td>位置(首+近)</td><td>否</td><td>无限流式</td></tr>
+  <tr><td>H2O</td><td>累计注意力分</td><td>是</td><td>留住题眼</td></tr>
+  <tr><td>SnapKV</td><td>prompt 末段投票</td><td>是</td><td>长 prompt 压缩</td></tr></tbody></table>
+  <div class="aside insight"><span class="al">洞见 · 莫混淆"不崩"与"记得"</span>StreamingLLM 令模型在无限长输入上"不崩",但它<b>断不能令模型记住</b>被驱逐之内容——它为流式吞吐而生,非为无损长上下文而设。若任务需精确回溯任意历史细节(检索、长程推理),则当转投无损之途:全缓存,辅以卸载或量化。</div>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>缓存钉于固定预算,与序列长度脱钩;理论上支撑无限流式生成,显存恒定不增。</div><div class="con"><h5>所偿者</h5>被驱逐之信息不可复得;对需回看任意历史的任务有损。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Efficient Streaming Language Models with Attention Sinks</b> · <span>Xiao et al., 2023</span></div>
+  <div class="p"><b>H2O: Heavy-Hitter Oracle for Efficient Generative Inference</b> · <span>Zhang et al., 2023</span></div>
+  <div class="p"><b>SnapKV / Scissorhands / FastGen</b> · <span>2023–2024</span></div></div>
+</section><section class="sec" id="s5">
+      <div class="eyebrow">SECTION 04</div>
+      <h2>分页管理显存</h2>
+      <div class="dek">PagedAttention —— 借虚拟内存之智,灭碎片之患</div>
+      <div class="quote">缓存的麻烦,一半在它太大,一半在它太乱。</div><div class="plate"><svg viewBox="0 0 560 140"><text x="14" y="20" class="bl">传统连续预留 — 阴影为预留却用不上的内部碎片</text><rect x="14" y="28" width="280" height="20" rx="3" fill="none" stroke="#cbbb9c"></rect><rect x="16" y="30" width="100" height="16" rx="2" fill="#3d5a45"></rect><rect x="118" y="30" width="174" height="16" fill="#e3d7be"></rect><text x="360" y="42" class="bl" style="fill:#7a3b2e">↑ 浪费</text>
+    <text x="14" y="86" class="bl">PagedAttention — 切块按需分配,可跨请求共享,几无碎片</text><rect x="14" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="36" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="58" y="94" width="18" height="18" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="80" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="102" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="124" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="146" y="94" width="18" height="18" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="168" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="190" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="212" y="94" width="18" height="18" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="234" y="94" width="18" height="18" rx="2" fill="#9a7b3f" stroke="#cbbb9c"></rect><rect x="256" y="94" width="18" height="18" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><text x="360" y="107" class="bl" style="fill:#9a7b3f">块 = 16/32 token</text></svg><div class="fcap"><b>图 4.1</b>连续预留之浪费,对分页之紧致</div></div>
+  <p class="drop">至此,我们转入"把缓存管好"之途。本途不削缓存中分毫数据,而专攻其安放、复用与迁移。开篇即是奠基之作——PagedAttention(vLLM,2023)。它不减一字节缓存,却将显存利用率由传统之二三成,提至近乎满载,从而在同一张卡上服务数倍的并发。</p>
+  <h3>连续分配的两种碎片</h3>
+  <p>传统之法,按 <code>max_seq_len</code> 为每个请求预留一整块<b>连续</b>显存。祸患有二:</p>
+  <ul><li><b>内部碎片</b> — 实际生成长度远短于预留,中间一大段预留却终未用上。此为损耗之大宗。</li>
+  <li><b>外部碎片</b> — 各请求预留块大小参差,释放后留下难以再利用的空隙。</li></ul>
+  <h3>分页之机</h3>
+  <p>PagedAttention 将每个序列的 KV Cache 切作固定大小的<b>块(block)</b>,通常容 16 或 32 个 token。一张<b>块表</b>维护逻辑块至物理块的映射,与操作系统的页表如出一辙。</p>
+  <div class="theorem"><div class="tname">命题 4.1 — 内部碎片之界</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mtext>每序列内部碎片</mtext>  <mo>&lt;</mo>  <mtext>block_size</mtext>  <mtext>个&nbsp;token</mtext></mrow><annotation encoding="application/x-tex">\text{每序列内部碎片}\;&lt;\;\text{block\_size}\;\text{个 token}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.7224em; vertical-align: -0.0391em;"></span><span class="mord text"><span class="mord cjk_fallback">每序列内部碎片</span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">&lt;</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1.0044em; vertical-align: -0.31em;"></span><span class="mord text"><span class="mord">block_size</span></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mord text"><span class="mord cjk_fallback">个</span><span class="mord">&nbsp;token</span></span></span></span></span></span></span>
+  <div class="note">块愈小,碎片愈微,然块表愈大、kernel 寻址愈繁。16/32 乃实测之平衡。</div></div>
+  <ul><li>物理块<b>无须连续</b>,按需分配,内部碎片遂被限于一块之内。</li>
+  <li>注意力 kernel 须改写为能从<b>非连续</b>的物理块中聚集(gather)K、V——此即"Paged"之名所系,亦其工程之核。</li></ul>
+  <div class="aside insight"><span class="al">洞见 · 写时复制</span>beam search、并行采样等场景下,多个序列共享同一前缀。分页令它们<b>共享物理块</b>,仅当某序列将于分叉处写入时,方复制该块——与操作系统的 fork/copy-on-write 别无二致。此机制,正是下一章"前缀缓存"得以成立的底层基石。</div>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>显存利用率近乎满载;vLLM 原论文载,吞吐较当时之 HF / FasterTransformer 提升 <b>二至四倍</b>。对模型质量<b>毫无影响</b>,数学输出分毫不变。</div><div class="con"><h5>所偿者</h5>定制注意力 kernel 之繁复;块表间接寻址的微小开销;block_size 需调优。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Efficient Memory Management for Large Language Model Serving with PagedAttention</b> · <span>Kwon et al., 2023(vLLM)</span></div></div>
+</section><section class="sec" id="s6">
+      <div class="eyebrow">SECTION 05</div>
+      <h2>跨请求复用</h2>
+      <div class="dek">前缀缓存 —— 相同的开头,只算一次</div>
+      <div class="quote">成千上万的请求共享同一段开头,何必each都重算一遍?</div><div class="plate"><svg viewBox="0 0 560 140"><text x="14" y="40" class="blb">A</text><rect x="38" y="28" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="60" y="28" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="82" y="28" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="104" y="28" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="126" y="28" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="148" y="28" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="170" y="28" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="192" y="28" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><text x="14" y="70" class="blb">B</text><rect x="38" y="58" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="60" y="58" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="82" y="58" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="104" y="58" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="126" y="58" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="148" y="58" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="170" y="58" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="192" y="58" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><text x="14" y="100" class="blb">C</text><rect x="38" y="88" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="60" y="88" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="82" y="88" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="104" y="88" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="126" y="88" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"></rect><rect x="148" y="88" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="170" y="88" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><rect x="192" y="88" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"></rect><text x="340" y="40" class="bl" style="fill:#3d5a45">墨绿 = 公共前缀</text><text x="340" y="60" class="bl" style="fill:#3d5a45">只计算一次,复用</text><text x="340" y="86" class="bl">浅色 = 各自续写</text><text x="14" y="130" class="bl" style="fill:#9a7b3f;font-style:italic">命中相同前缀 → 跳过其重复 prefill,直降 TTFT</text></svg><div class="fcap"><b>图 5.1</b>多请求共享前缀,墨色部分只算一次</div></div>
+  <p class="drop">海量请求往往共享相同的开篇——同一段 system prompt、同一组 few-shot 示例、同一篇被反复叩问的文档。前缀缓存将这段公共前缀的 K、V 算定后存留,后继命中之请求径直复用,跳过对它的重复 prefill。这一节所省者,非显存,而是<b>计算</b>。</p>
+  <h3>何以前缀须"精确而对齐"</h3>
+  <p>K、V 是位置相关的——同一 token 处于不同位置,所算出的 K、V 不同。故复用之前提极苛:两请求须<b>自第零个 token 起,逐 token 完全相同</b>;但有一处相异,其后的 K、V 尽数失效。这是 token 级、前缀对齐的匹配,不可跳跃,不可自中段起。</p>
+  <h3>两种实现:哈希与基数树</h3>
+  <table class="booktable"><caption>表 5.1 — 前缀缓存的两种组织</caption>
+  <tbody><tr><th>方案</th><th>机制</th><th>共享粒度</th><th>代表</th></tr>
+  <tr><td>Hash 前缀</td><td>对固定前缀分块哈希,查表命中</td><td>块级,宜固定模板</td><td>vLLM APC</td></tr>
+  <tr><td>RadixAttention</td><td>以基数树组织全部请求前缀,自动共享最长公共路径</td><td>动态细粒度,宜对话树</td><td>SGLang</td></tr></tbody></table>
+  <p><b>RadixAttention</b>(SGLang)是更通达之方:将所有活跃序列的 token 路径组织为一棵<b>基数树</b>,新请求沿树匹配最长公共前缀,自动复用相应缓存块,并以 <b>LRU</b> 驱逐冷僻枝节。多轮对话、共享示例、树状采样等繁复的共享结构,皆被它从容收纳。</p>
+  <div class="aside insight"><span class="al">洞见 · 收益落于何处</span>前缀缓存优化的是 <b>prefill 计算</b>,直降 <b>TTFT(首 token 延迟)</b>。它<b>丝毫不触及 decode</b>——其后逐 token 之生成,该多慢仍多慢。故于"长前缀、短续写"之境(RAG、冗长 system prompt)收益至巨,于"短前缀、长生成"则几近无感。</div>
+  <p>它构筑于 PagedAttention 的块共享之上:命中之前缀,径直挂上既有物理块(以写时复制护持),无须重算,亦不重复占用显存。它还须与 <b>chunked prefill</b> 协同,免得冗长前缀的预填充阻塞他者之解码。</p>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>高重复前缀之境,TTFT 与 prefill 算力大减;多租户共享 system prompt 时收益尤著。</div><div class="con"><h5>所偿者</h5>收益全系于命中率,前缀纷杂则近乎无用;须维护匹配结构(树/哈希)与驱逐之策。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>SGLang: Efficient Execution of Structured LM Programs (RadixAttention)</b> · <span>Zheng et al., 2023</span></div></div>
+</section><section class="sec" id="s7">
+      <div class="eyebrow">SECTION 06</div>
+      <h2>卸载与集群调度</h2>
+      <div class="dek">分级存储与 PD 分离 —— 以带宽换容量,以分工逐瓶颈</div>
+      <div class="quote">显存装不下,就让缓存在存储层级之间流动起来。</div><div class="plate"><svg viewBox="0 0 560 140"><rect x="24" y="34" width="130" height="58" rx="4" fill="rgba(61,90,69,.12)" stroke="#3d5a45"></rect><text x="89" y="58" text-anchor="middle" class="blb">GPU 显存</text><text x="89" y="76" text-anchor="middle" class="bl">TB/s · 小</text>
+    <rect x="215" y="34" width="130" height="58" rx="4" fill="rgba(154,123,63,.12)" stroke="#9a7b3f"></rect><text x="280" y="58" text-anchor="middle" class="blb">CPU 内存</text><text x="280" y="76" text-anchor="middle" class="bl">~数十GB/s · 中</text>
+    <rect x="406" y="34" width="130" height="58" rx="4" fill="rgba(122,59,46,.10)" stroke="#7a3b2e"></rect><text x="471" y="58" text-anchor="middle" class="blb">磁盘 / NVMe</text><text x="471" y="76" text-anchor="middle" class="bl">GB/s · 巨大</text>
+    <line x1="154" y1="63" x2="215" y2="63" stroke="#9a7b3f" stroke-dasharray="4 3"></line><polygon points="215,63 207,59 207,67" fill="#9a7b3f"></polygon><line x1="345" y1="63" x2="406" y2="63" stroke="#7a3b2e" stroke-dasharray="4 3"></line><polygon points="406,63 398,59 398,67" fill="#7a3b2e"></polygon>
+    <text x="280" y="120" text-anchor="middle" class="bl" style="fill:#9a7b3f;font-style:italic">PCIe ≈ 32GB/s vs 显存 TB/s — 差两个数量级,预取须掩盖搬运</text></svg><div class="fcap"><b>图 6.1</b>GPU→CPU→磁盘的分级存储与带宽落差</div></div>
+  <p class="drop">当 KV Cache 大至显存不能相容,与其有损地削减,不如将一时用不到者,迁往更广而更缓的存储——是为<b>以带宽换容量</b>。在集群之尺度上,更可将 prefill 与 decode 拆分,各就其最适之硬件。这一节登抵全文之顶:系统与集群层面的缓存治理。</p>
+  <h3>分级卸载:先把账算清</h3>
+  <p>GPU 与 CPU 之间经 PCIe 相通(PCIe 4.0 ×16 单向约 32 GB/s),而 GPU 显存带宽则在 TB/s 之列——<b>相差两个数量级</b>。故朴素的卸载极易令搬运沦为瓶颈。其是否划算,系于一条不等式:</p>
+  <div class="theorem"><div class="tname">命题 6.1 — 卸载划算之条件</div>
+  <span><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>t</mi><mtext>compute</mtext></msub><mo stretchy="false">(</mo><mtext>层</mtext><mo stretchy="false">)</mo>  <mo>≳</mo>  <msub><mi>t</mi><mtext>transfer</mtext></msub><mo stretchy="false">(</mo><mtext>层&nbsp;KV</mtext><mo stretchy="false">)</mo><mo>=</mo><mfrac><mtext>该层&nbsp;KV&nbsp;字节</mtext><mtext>PCIe&nbsp;带宽</mtext></mfrac></mrow><annotation encoding="application/x-tex">t_{\text{compute}}(\text{层})\;\gtrsim\;t_{\text{transfer}}(\text{层 KV})=\frac{\text{该层 KV 字节}}{\text{PCIe 带宽}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1.0361em; vertical-align: -0.2861em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.2806em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">compute</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.2861em;"><span class=""></span></span></span></span></span></span><span class="mopen">(</span><span class="mord text"><span class="mord cjk_fallback">层</span></span><span class="mclose">)</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel amsrm">≳</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 0.3361em;"><span class="" style="top: -2.55em; margin-left: 0em; margin-right: 0.05em;"><span class="pstrut" style="height: 2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">transfer</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.15em;"><span class=""></span></span></span></span></span></span><span class="mopen">(</span><span class="mord text"><span class="mord cjk_fallback">层</span><span class="mord">&nbsp;KV</span></span><span class="mclose">)</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 2.0463em; vertical-align: -0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height: 1.3603em;"><span class="" style="top: -2.314em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord text"><span class="mord">PCIe&nbsp;</span><span class="mord cjk_fallback">带宽</span></span></span></span><span class="" style="top: -3.23em;"><span class="pstrut" style="height: 3em;"></span><span class="frac-line" style="border-bottom-width: 0.04em;"></span></span><span class="" style="top: -3.677em;"><span class="pstrut" style="height: 3em;"></span><span class="mord"><span class="mord text"><span class="mord cjk_fallback">该层</span><span class="mord">&nbsp;KV&nbsp;</span><span class="mord cjk_fallback">字节</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height: 0.686em;"><span class=""></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span></span>
+  <div class="note">唯当一层的计算耗时足以掩盖下一层 KV 的搬运耗时,异步预取方近乎"免费";否则延迟暴露,解码受拖。</div></div>
+  <p>工程之要,在 <b>逐层异步预取</b>:计算第 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>i</mi></mrow><annotation encoding="application/x-tex">i</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6595em;"></span><span class="mord mathnormal">i</span></span></span></span></span> 层之际,以独立的 CUDA stream 将第 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>i</mi><mo lspace="0em" rspace="0em">+</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">i{+}1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.7429em; vertical-align: -0.0833em;"></span><span class="mord mathnormal">i</span><span class="mord"><span class="mord">+</span></span><span class="mord">1</span></span></span></span></span> 层的 KV 自 CPU 预取回显存,使传输与计算<b>交叠</b>。FlexGen 更进一步,将权重、KV、激活的卸载,统筹为一个整体的调度优化问题。</p>
+  <h3>PD 分离:拆开相冲的两阶段</h3>
+  <p>prefill 乃<b>计算受限</b>(并行处理整段 prompt,饱食算力),decode 乃<b>访存受限</b>(逐 token 而行,渴求带宽)。二者混于一批,则相互掣肘——冗长的 prefill 阻塞他者之 decode,致延迟抖动。<b>PD 分离</b>(Prefill-Decode Disaggregation)将其部署于<b>不同的 GPU 池</b>:</p>
+  <ul><li>Prefill 池算定 prompt,将所生之 <b>KV Cache 传输</b>予 Decode 池,由其接掌生成。</li>
+  <li>传输须走高速互联(<b>NVLink / RDMA</b>),否则跨节点搬运 KV 又成新瓶颈。</li>
+  <li>两池各自独立伸缩、各用其宜的并行策略,分头榨干各自的瓶颈资源。</li></ul>
+  <div class="aside insight"><span class="al">洞见 · 以 KV 为中心的架构</span>前沿如 Mooncake(Kimi),将 KV Cache 抽象为一座<b>独立的分布式存储池</b>,跨请求、跨节点、跨时间而复用——本质上,是把"前缀缓存 + 卸载 + PD 分离"熔铸为一套以 KV 为中心的服务架构。此乃当下大规模推理系统演进之重心。</div>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>突破单卡显存之限,支撑超长上下文与超大并发;PD 分离消弭阶段间的相互干扰,增益集群吞吐与延迟之稳。</div><div class="con"><h5>所偿者</h5>卸载受制于 PCIe 带宽,预取未掩则拖慢延迟;PD 分离引入跨节点传输与繁复调度,须高速互联为之撑持。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>FlexGen: High-Throughput Generative Inference of LLMs with a Single GPU</b> · <span>Sheng et al., 2023</span></div>
+  <div class="p"><b>Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving</b> · <span>Moonshot AI, 2024</span></div>
+  <div class="p"><b>DistServe / Splitwise — Prefill-Decode 分离</b> · <span>2024</span></div></div>
+</section><section class="sec" id="s8">
+      <div class="eyebrow">SECTION 07</div>
+      <h2>全景与系统架构</h2>
+      <div class="dek">把六章拼成一张图 —— 从演进谱系到生产系统的数据流</div>
+      <div class="quote">这些技术不是一份清单,而是一张彼此牵引的网。</div>
+  <p class="lede">前面几节逐一拆解了各项技术。这一节我们退后一步,把它们放回同一张图里:它们如何沿时间演进,如何在一次推理中各司其职,又如何在一个真实的推理系统中协同成一条以 KV 为中心的数据流。</p>
+  <h3>演进谱系</h3>
+  <p>结构层的技术沿一条清晰的时间线展开:自 2017 年的 MHA,到 2019 年极简的 MQA,再到 2023 年折中的 GQA、2024 年低秩的 MLA。它们是<b>同一维度上的迭代,四选其一</b>。而系统层的技术(量化、分页、前缀缓存、卸载)与这条结构线<b>正交</b>——它们叠加在任意结构之上,可以全部开启。</p>
+  <div class="plate"><svg viewBox="0 0 720 440">
+    <text x="40" y="22" class="blb">谱系一 · 注意力结构的演进</text>
+    <text x="40" y="40" class="bl">MHA 为根,三种后继沿"越来越省"的方向展开 · 同一维度,四选其一</text>
+    <!-- 省显存方向轴 -->
+    <line x1="60" y1="62" x2="660" y2="62" stroke="#cbb"></line><polygon points="660,62 652,58 652,66" fill="#cbb"></polygon>
+    <text x="62" y="56" class="bl" style="fill:#7b8794">缓存大</text><text x="658" y="56" text-anchor="end" class="bl" style="fill:#7b8794">缓存小</text>
+    <!-- 四个结构框,等距单行 -->
+    
+      <rect x="40" y="78" width="130" height="54" rx="5" fill="#fff" stroke="#11161c" stroke-width="1.5"></rect>
+      <text x="105" y="99" text-anchor="middle" class="blb">MHA</text>
+      <text x="105" y="116" text-anchor="middle" class="bl">2017 · 每头独立 K/V</text>
+      <text x="105" y="152" text-anchor="middle" class="bl" style="fill:#7b8794">基线</text>
+      <rect x="210" y="78" width="130" height="54" rx="5" fill="#fff" stroke="#11161c" stroke-width="1"></rect>
+      <text x="275" y="99" text-anchor="middle" class="blb">MQA</text>
+      <text x="275" y="116" text-anchor="middle" class="bl">2019 · 全头共享 1 组</text>
+      <text x="275" y="152" text-anchor="middle" class="bl" style="fill:#7b8794">最省·质量降</text>
+      <rect x="380" y="78" width="130" height="54" rx="5" fill="#f3f5f7" stroke="#11161c" stroke-width="1"></rect>
+      <text x="445" y="99" text-anchor="middle" class="blb">GQA</text>
+      <text x="445" y="116" text-anchor="middle" class="bl">2023 · 分组共享</text>
+      <text x="445" y="152" text-anchor="middle" class="bl" style="fill:#7b8794">折中·可迁移</text>
+      <rect x="550" y="78" width="130" height="54" rx="5" fill="#fff" stroke="#11161c" stroke-width="1"></rect>
+      <text x="615" y="99" text-anchor="middle" class="blb">MLA</text>
+      <text x="615" y="116" text-anchor="middle" class="bl">2024 · 低秩潜向量</text>
+      <text x="615" y="152" text-anchor="middle" class="bl" style="fill:#7b8794">压缩狠·质量佳</text>
+    <!-- 串联箭头:相邻框之间,统一在 y=105 -->
+    <line x1="170" y1="105" x2="210" y2="105" stroke="#11161c"></line><polygon points="210,105 202,101 202,109" fill="#11161c"></polygon><line x1="340" y1="105" x2="380" y2="105" stroke="#11161c"></line><polygon points="380,105 372,101 372,109" fill="#11161c"></polygon><line x1="510" y1="105" x2="550" y2="105" stroke="#11161c"></line><polygon points="550,105 542,101 542,109" fill="#11161c"></polygon>
+    <!-- GQA 标配角标 -->
+    <text x="445" y="174" text-anchor="middle" class="bl" style="fill:#e5484d">← 当今开源标配</text>
+    <!-- 分隔 -->
+    <line x1="40" y1="200" x2="680" y2="200" stroke="#e7eaee"></line>
+    <!-- 谱系二:系统层 -->
+    <text x="40" y="224" class="blb">谱系二 · 系统层技术(正交于结构,可叠加)</text>
+    <text x="40" y="242" class="bl">不改模型、即插即用 · 虚线表示"叠加在所选结构之上"</text>
+    <!-- 基座 -->
+    <rect x="110" y="258" width="500" height="38" rx="5" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect>
+    <text x="360" y="281" text-anchor="middle" class="bl">基座:上方任选一种结构(MHA / GQA / MLA …)</text>
+    <!-- 四个系统层模块,均匀分布,虚线垂直连到基座 -->
+    
+      <line x1="152" y1="296" x2="152" y2="332" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="90" y="332" width="124" height="50" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="152" y="354" text-anchor="middle" class="blb">量化</text>
+      <text x="152" y="372" text-anchor="middle" class="bl">降精度</text>
+      <line x1="305" y1="296" x2="305" y2="332" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="243" y="332" width="124" height="50" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="305" y="354" text-anchor="middle" class="blb">分页</text>
+      <text x="305" y="372" text-anchor="middle" class="bl">PagedAttn</text>
+      <line x1="458" y1="296" x2="458" y2="332" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="396" y="332" width="124" height="50" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="458" y="354" text-anchor="middle" class="blb">前缀缓存</text>
+      <text x="458" y="372" text-anchor="middle" class="bl">跨请求复用</text>
+      <line x1="611" y1="296" x2="611" y2="332" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="549" y="332" width="124" height="50" rx="5" fill="#fff" stroke="#11161c"></rect>
+      <text x="611" y="354" text-anchor="middle" class="blb">卸载 / PD</text>
+      <text x="611" y="372" text-anchor="middle" class="bl">扩容·分工</text>
+    <text x="40" y="414" class="bl" style="fill:#e5484d">上层四选一(改结构、需重训) · 下层可全开(纯引擎、即插即用) · 量化乘性叠加于任意结构</text>
+  </svg><div class="fcap"><b>图 7.1</b>技术演进谱系 ── 结构层四选一(实线改进),系统层可叠加(虚线正交)</div></div>
+  <h3>一次推理中的分工</h3>
+  <p>把镜头拉到单次请求的时间轴上,prefill 与 decode 两段泾渭分明:前者并行、算力受限,后者逐字、带宽受限。各项技术作用于不同的段落——这解释了为何缩缓存的技术主要在 decode 见效,而前缀缓存只省 prefill。</p>
+  <div class="plate"><svg viewBox="0 0 720 410">
+    <text x="40" y="22" class="blb">一次请求的时间轴(按比例:prefill 短,decode 长)</text>
+    <line x1="200" y1="44" x2="680" y2="44" stroke="#cbb"></line><polygon points="680,44 672,40 672,48" fill="#cbb"></polygon>
+    <text x="676" y="38" text-anchor="end" class="bl" style="fill:#7b8794">时间 →</text>
+    <!-- prefill 块 -->
+    <rect x="200" y="56" width="130" height="52" rx="5" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect>
+    <text x="265" y="78" text-anchor="middle" class="blb">Prefill</text><text x="265" y="95" text-anchor="middle" class="bl">并行读 prompt</text>
+    <!-- decode 块 -->
+    <rect x="338" y="56" width="342" height="52" rx="5" fill="#fff" stroke="#11161c" stroke-width="1.5"></rect>
+    <text x="509" y="78" text-anchor="middle" class="blb">Decode</text><text x="509" y="95" text-anchor="middle" class="bl">逐 token 生成,每步读全部 KV</text>
+    <line x1="370" y1="56" x2="370" y2="108" stroke="#eef1f4"></line><line x1="404" y1="56" x2="404" y2="108" stroke="#eef1f4"></line><line x1="438" y1="56" x2="438" y2="108" stroke="#eef1f4"></line><line x1="472" y1="56" x2="472" y2="108" stroke="#eef1f4"></line><line x1="506" y1="56" x2="506" y2="108" stroke="#eef1f4"></line><line x1="540" y1="56" x2="540" y2="108" stroke="#eef1f4"></line><line x1="574" y1="56" x2="574" y2="108" stroke="#eef1f4"></line><line x1="608" y1="56" x2="608" y2="108" stroke="#eef1f4"></line><line x1="642" y1="56" x2="642" y2="108" stroke="#eef1f4"></line>
+    <text x="265" y="128" text-anchor="middle" class="bl" style="fill:#e5484d">算力受限</text>
+    <text x="509" y="128" text-anchor="middle" class="bl" style="fill:#e5484d">显存带宽受限</text>
+    <line x1="40" y1="146" x2="680" y2="146" stroke="#e7eaee"></line>
+    <text x="40" y="168" class="bl">各技术的作用区间(左为名称,右侧条形覆盖其生效阶段):</text>
+    <!-- 左名称列 + 右区间条;prefill 区 200-330, decode 区 338-680, 全程 200-680 -->
+    
+      <text x="40" y="200" class="blb">前缀缓存</text>
+      <rect x="200" y="186" width="130" height="20" rx="3" fill="#f3f5f7" stroke="#11161c"></rect>
+      <text x="265" y="200" text-anchor="middle" class="bl" style="fill:#7b8794">降 TTFT</text>
+      <text x="40" y="226" class="blb">分块预填充</text>
+      <rect x="200" y="212" width="130" height="20" rx="3" fill="#f3f5f7" stroke="#11161c"></rect>
+      <text x="265" y="226" text-anchor="middle" class="bl" style="fill:#7b8794">削峰值</text>
+      <text x="40" y="252" class="blb">MQA/GQA/MLA</text>
+      <rect x="338" y="238" width="342" height="20" rx="3" fill="#fff" stroke="#11161c"></rect>
+      <text x="509" y="252" text-anchor="middle" class="bl" style="fill:#7b8794">解码提速</text>
+      <text x="40" y="278" class="blb">量化</text>
+      <rect x="338" y="264" width="342" height="20" rx="3" fill="#fff" stroke="#11161c"></rect>
+      <text x="509" y="278" text-anchor="middle" class="bl" style="fill:#7b8794">解码提速</text>
+      <text x="40" y="304" class="blb">窗口 / 淘汰</text>
+      <rect x="338" y="290" width="342" height="20" rx="3" fill="#fff" stroke="#11161c"></rect>
+      <text x="509" y="304" text-anchor="middle" class="bl" style="fill:#7b8794">控缓存</text>
+      <text x="40" y="330" class="blb">PagedAttention</text>
+      <rect x="200" y="316" width="480" height="20" rx="3" fill="#faf0ec" stroke="#11161c"></rect>
+      <text x="440" y="330" text-anchor="middle" class="bl" style="fill:#7b8794">全程放置</text>
+      <text x="40" y="356" class="blb">分级卸载</text>
+      <rect x="200" y="342" width="480" height="20" rx="3" fill="#faf0ec" stroke="#11161c"></rect>
+      <text x="440" y="356" text-anchor="middle" class="bl" style="fill:#7b8794">全程迁移</text>
+    <line x1="40" y1="376" x2="680" y2="376" stroke="#e7eaee"></line>
+    <text x="40" y="398" class="bl" style="fill:#e5484d">缩缓存的技术虽在 decode 见效,但缓存于 prefill 即建好;前缀缓存只降 TTFT,不触及 decode 速度</text>
+  </svg><div class="fcap"><b>图 7.2</b>推理时间线 ── 各技术作用于 prefill / decode / 全程</div></div>
+  <h3>系统架构:数据如何流动</h3>
+  <p>真实的推理引擎(vLLM、SGLang、TensorRT-LLM)把这些技术编织成一条流水线。请求经调度器作连续批处理与分块预填充,经前缀匹配复用已有缓存,核心则是那个以 PagedAttention 为底座的 <b>KV Cache 管理器</b>——它掌管块表映射、写时复制与跨请求共享,并在 GPU、CPU、磁盘的分级存储间迁移缓存块。大规模部署还可将 prefill 与 decode 拆作两个 GPU 池,以 NVLink/RDMA 传输 KV。</p>
+  <div class="plate"><svg viewBox="0 0 720 460">
+    <text x="40" y="18" class="bl">现代 LLM 推理系统 · KV Cache 为中心的数据流</text>
+    <!-- 请求入口 -->
+    <rect x="40" y="34" width="130" height="40" rx="4" fill="none" stroke="#11161c"></rect><text x="105" y="52" text-anchor="middle" class="blb">请求队列</text><text x="105" y="67" text-anchor="middle" class="bl">prompts in</text>
+    <line x1="170" y1="54" x2="220" y2="54" stroke="#11161c"></line><polygon points="220,54 213,50 213,58" fill="#11161c"></polygon>
+    <!-- 调度器 -->
+    <rect x="220" y="34" width="160" height="40" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect><text x="300" y="52" text-anchor="middle" class="blb">调度器 Scheduler</text><text x="300" y="67" text-anchor="middle" class="bl">连续批处理 · 分块预填充</text>
+    <line x1="380" y1="54" x2="430" y2="54" stroke="#11161c"></line><polygon points="430,54 423,50 423,58" fill="#11161c"></polygon>
+    <!-- 前缀匹配 -->
+    <rect x="430" y="34" width="160" height="40" rx="4" fill="none" stroke="#11161c"></rect><text x="510" y="52" text-anchor="middle" class="blb">前缀匹配</text><text x="510" y="67" text-anchor="middle" class="bl">RadixTree / Hash 命中复用</text>
+    <!-- KV 管理器中枢 -->
+    <rect x="200" y="120" width="320" height="56" rx="4" fill="#fff" stroke="#e5484d" stroke-width="1.5"></rect><text x="360" y="142" text-anchor="middle" class="blb" style="fill:#e5484d">KV Cache 管理器(PagedAttention)</text><text x="360" y="160" text-anchor="middle" class="bl">块表映射 · 写时复制 · 按需分配 · 跨请求共享</text>
+    <line x1="300" y1="74" x2="330" y2="120" stroke="#11161c" stroke-dasharray="3 3"></line><line x1="510" y1="74" x2="400" y2="120" stroke="#11161c" stroke-dasharray="3 3"></line>
+    <!-- 存储层级 -->
+    <text x="40" y="210" class="bl">分级存储(以带宽换容量)</text>
+    <rect x="40" y="220" width="180" height="56" rx="4" fill="#fff" stroke="#11161c"></rect><text x="130" y="242" text-anchor="middle" class="blb">GPU 显存(HBM)</text><text x="130" y="260" text-anchor="middle" class="bl">活跃块 · TB/s</text>
+    <rect x="250" y="220" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#cbb"></rect><text x="340" y="242" text-anchor="middle" class="blb">CPU 内存</text><text x="340" y="260" text-anchor="middle" class="bl">温块卸载 · ~数十 GB/s</text>
+    <rect x="460" y="220" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#cbb"></rect><text x="550" y="242" text-anchor="middle" class="blb">磁盘 / NVMe / 远端池</text><text x="550" y="260" text-anchor="middle" class="bl">冷块 · Mooncake 式</text>
+    <line x1="360" y1="176" x2="130" y2="220" stroke="#11161c"></line><polygon points="130,220 134,212 138,221" fill="#11161c"></polygon>
+    <line x1="220" y1="248" x2="250" y2="248" stroke="#cbb" stroke-dasharray="3 3"></line><polygon points="250,248 243,244 243,252" fill="#7b8794"></polygon>
+    <line x1="430" y1="248" x2="460" y2="248" stroke="#cbb" stroke-dasharray="3 3"></line><polygon points="460,248 453,244 453,252" fill="#7b8794"></polygon>
+    <!-- PD 分离 -->
+    <line x1="40" y1="306" x2="680" y2="306" stroke="#e7eaee"></line>
+    <text x="40" y="328" class="bl">PD 分离(大规模部署可选)</text>
+    <rect x="120" y="340" width="180" height="48" rx="4" fill="#f3f5f7" stroke="#11161c"></rect><text x="210" y="360" text-anchor="middle" class="blb">Prefill 池</text><text x="210" y="376" text-anchor="middle" class="bl">算力密集 GPU</text>
+    <rect x="420" y="340" width="180" height="48" rx="4" fill="#fff" stroke="#11161c"></rect><text x="510" y="360" text-anchor="middle" class="blb">Decode 池</text><text x="510" y="376" text-anchor="middle" class="bl">带宽密集 GPU</text>
+    <line x1="300" y1="364" x2="420" y2="364" stroke="#e5484d"></line><polygon points="420,364 412,360 412,368" fill="#e5484d"></polygon>
+    <text x="360" y="356" text-anchor="middle" class="bl" style="fill:#e5484d">KV 传输</text><text x="360" y="382" text-anchor="middle" class="bl">NVLink / RDMA</text>
+    <text x="40" y="430" class="bl" style="fill:#7b8794">注:实线 = 数据流 · 虚线 = 块的迁移/映射 · 红 = 以 KV 为中心的关键路径</text>
+  </svg><div class="fcap"><b>图 7.3</b>现代推理系统架构 ── KV Cache 管理器是整条数据流的中枢</div></div>
+  <div class="marginalia"><div class="mk">❡</div><div class="mtext">注意红色的关键路径:几乎所有系统层优化,最终都汇聚到那个 KV Cache 管理器。它是"把缓存管好"一途的物理化身。</div></div>
+  <h3>如何取舍:一张决策图</h3>
+  <p>面对具体场景,选择并不玄奥。先认清首要约束——是显存装不下、并发上不去、还是首字延迟高——再沿决策图择取对应技术。一条通则贯穿始终:<b>右途(系统)先全开,左途(结构)按训练条件择一,量化按精度预算叠加。</b></p>
+  <div class="plate"><svg viewBox="0 0 720 360">
+    <text x="40" y="20" class="bl">决策:面对约束,优先考虑哪些技术</text>
+    <rect x="280" y="34" width="160" height="40" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"></rect><text x="360" y="54" text-anchor="middle" class="blb">你的首要约束?</text><text x="360" y="68" text-anchor="middle" class="bl">start here</text>
+    
+      <line x1="360" y1="74" x2="160" y2="110" stroke="#11161c"></line>
+      <rect x="80" y="110" width="160" height="40" rx="4" fill="none" stroke="#e5484d"></rect><text x="160" y="130" text-anchor="middle" class="blb" style="fill:#e5484d">显存装不下</text><text x="160" y="145" text-anchor="middle" class="bl">场景</text>
+      <line x1="160" y1="150" x2="160" y2="176" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="70" y="176" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#11161c"></rect><text x="160" y="198" text-anchor="middle" class="bl">改结构(若可重训):GQA/MLA</text><text x="160" y="216" text-anchor="middle" class="bl">否则推理期:量化 + 卸载</text>
+      <line x1="360" y1="74" x2="360" y2="110" stroke="#11161c"></line>
+      <rect x="280" y="110" width="160" height="40" rx="4" fill="none" stroke="#e5484d"></rect><text x="360" y="130" text-anchor="middle" class="blb" style="fill:#e5484d">并发上不去</text><text x="360" y="145" text-anchor="middle" class="bl">场景</text>
+      <line x1="360" y1="150" x2="360" y2="176" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="270" y="176" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#11161c"></rect><text x="360" y="198" text-anchor="middle" class="bl">PagedAttention + 连续批处理</text><text x="360" y="216" text-anchor="middle" class="bl">(纯引擎,先做这个)</text>
+      <line x1="360" y1="74" x2="560" y2="110" stroke="#11161c"></line>
+      <rect x="480" y="110" width="160" height="40" rx="4" fill="none" stroke="#e5484d"></rect><text x="560" y="130" text-anchor="middle" class="blb" style="fill:#e5484d">首字延迟高</text><text x="560" y="145" text-anchor="middle" class="bl">场景</text>
+      <line x1="560" y1="150" x2="560" y2="176" stroke="#cbb" stroke-dasharray="3 3"></line>
+      <rect x="470" y="176" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#11161c"></rect><text x="560" y="198" text-anchor="middle" class="bl">前缀缓存(若多请求共享前缀)</text><text x="560" y="216" text-anchor="middle" class="bl">+ 分块预填充</text>
+    <line x1="40" y1="270" x2="680" y2="270" stroke="#e7eaee"></line>
+    <text x="40" y="292" class="bl">超长上下文且需精确回看 → 全缓存 + 卸载 + 量化(勿用淘汰类,有损)</text>
+    <text x="40" y="312" class="bl">超长上下文但可容遗忘(流式)→ StreamingLLM / 窗口注意力</text>
+    <text x="40" y="332" class="bl" style="fill:#e5484d">通则:右途(系统)先全开,左途(结构)按训练条件择一,量化按精度预算叠加</text>
+  </svg><div class="fcap"><b>图 7.4</b>技术选择决策图 ── 由首要约束出发</div></div>
+  <div class="aside insight"><span class="al">小结</span>六类技术,两条正交之途,一个中枢(KV 管理器)。理解了这张全景,任何一项新技术——无论是更激进的压缩,还是更聪明的调度——都能被你迅速安放进这张图的某个位置。</div>
+</section><section class="sec" id="s9">
+  <div class="eyebrow">结语</div>
+  <h2>两途归一,与一个旧问</h2>
+  <div class="dek">KV Cache 究竟是不是模型结构的一部分?</div>
+  <p class="drop">讲到这里,可以收个尾了。所有技术,终归两途。<b>"做小"</b>一途(第一至三章)改的是缓存里"存多少",其中共享/压缩与少存,皆触动模型结构,须重训,且于质量有所取舍。<b>"管好"</b>一途(第四至六章)改的是缓存"怎么用",纯由推理引擎实现,不动模型权重分毫,数学输出全然不变。</p>
+  <div class="theorem"><div class="tname">命题 7.1 — 两途之正交</div>
+  <p style="margin:0;font-size:15px;color:var(--ink2)">设结构优化为 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="script">S</mi></mrow><annotation encoding="application/x-tex">\mathcal{S}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6833em;"></span><span class="mord mathcal" style="margin-right: 0.075em;">S</span></span></span></span></span>,系统优化为 <span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="script">E</mi></mrow><annotation encoding="application/x-tex">\mathcal{E}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.6833em;"></span><span class="mord mathcal" style="margin-right: 0.0894em;">E</span></span></span></span></span>,则二者可复合而互不相消:<span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mtext>显存收益</mtext><mo stretchy="false">(</mo><mi mathvariant="script">S</mi><mo>∘</mo><mi mathvariant="script">E</mi><mo stretchy="false">)</mo><mo>≈</mo><mtext>收益</mtext><mo stretchy="false">(</mo><mi mathvariant="script">S</mi><mo stretchy="false">)</mo><mo>×</mo><mtext>利用率</mtext><mo stretchy="false">(</mo><mi mathvariant="script">E</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\text{显存收益}(\mathcal{S}\circ\mathcal{E})\approx\text{收益}(\mathcal{S})\times\text{利用率}(\mathcal{E})</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord text"><span class="mord cjk_fallback">显存收益</span></span><span class="mopen">(</span><span class="mord mathcal" style="margin-right: 0.075em;">S</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">∘</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord mathcal" style="margin-right: 0.0894em;">E</span><span class="mclose">)</span><span class="mspace" style="margin-right: 0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right: 0.2778em;"></span></span><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord text"><span class="mord cjk_fallback">收益</span></span><span class="mopen">(</span><span class="mord mathcal" style="margin-right: 0.075em;">S</span><span class="mclose">)</span><span class="mspace" style="margin-right: 0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right: 0.2222em;"></span></span><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord text"><span class="mord cjk_fallback">利用率</span></span><span class="mopen">(</span><span class="mord mathcal" style="margin-right: 0.0894em;">E</span><span class="mclose">)</span></span></span></span></span>。</p>
+  <div class="note">故生产之系统(vLLM、SGLang、TensorRT-LLM),恒于左途择一结构,而右途能开者尽开之。</div></div>
+  <p>于是回到开头那个最朴素的问题:<b>KV Cache 是模型结构的一部分吗?</b></p>
+  <p>答曰:<b>否</b>。KV Cache 本身是<b>推理时的一种优化机制</b>,它不含任何可训练参数,也不改变模型的数学定义——有它无它,模型的输出完全相同(浮点误差不计),区别只在快慢。然而,那些<b>为缓存友好而生</b>的结构设计(GQA、MLA),确确实实改动了模型本身。量化则游移于两可之间。</p>
+  <div class="marginalia"><div class="mk">∎</div><div class="mtext">缓存非结构,然结构可为缓存而改。技术之演进,常在这"机制"与"结构"的往复借力之间。</div></div>
+  <p>这正是这篇文章想说的核心:KV Cache 是一道桥,一端系于模型的数学,一端系于系统的工程。读懂了它随哪些因子膨胀,也就读懂了这两端如何彼此牵引、共同塑造了今日大模型推理的全部形态。</p>
+  <p style="text-align:center;font-family:&#39;Cormorant Garamond&#39;;font-style:italic;font-size:20px;color:var(--accent);margin-top:40px">— 全 文 终 —</p>
+  <div style="text-align:center;color:var(--gold);font-size:20px;letter-spacing:.5em;margin-top:18px">❦</div>
+</section><div class="end"><div class="sig">—— <b>Bowen Su</b></div><div class="dot">· · ·</div></div></article>
+    <aside class="toc-side"><div class="th">目录</div><nav id="toc"><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s1" data-id="s1" class="active"><span class="n">00</span>引子:为何缓存</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s2" data-id="s2"><span class="n">01</span>共享与压缩 K、V</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s3" data-id="s3"><span class="n">02</span>量化降精度</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s4" data-id="s4"><span class="n">03</span>少存 token</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s5" data-id="s5"><span class="n">04</span>分页管理显存</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s6" data-id="s6"><span class="n">05</span>跨请求复用</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s7" data-id="s7"><span class="n">06</span>卸载与集群调度</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s8" data-id="s8"><span class="n">07</span>全景与系统架构</a><a href="file:///C:/Users/42080/Downloads/KV_Cache_%E5%85%A8%E8%A7%A3_BowenSu_2.html#s9" data-id="s9"><span class="n">fin</span>结语:两途归一</a></nav></aside>
+  </div>
+
+<script>
+const PAGES = [];
+/* ===== 新增:知识地图 / 架构图 SVG(极简黑白线条) ===== */
+const MAPS = {
+  overview:`<svg viewBox="0 0 720 430">
+    <!-- 根 -->
+    <rect x="290" y="12" width="140" height="42" rx="5" fill="none" stroke="#11161c" stroke-width="1.5"/>
+    <text x="360" y="32" text-anchor="middle" class="blb">KV Cache</text>
+    <text x="360" y="46" text-anchor="middle" class="bl">用显存换计算</text>
+    <!-- 根到两个分支头 -->
+    <line x1="360" y1="54" x2="360" y2="70" stroke="#11161c"/>
+    <line x1="170" y1="70" x2="550" y2="70" stroke="#11161c"/>
+    <line x1="170" y1="70" x2="170" y2="86" stroke="#11161c"/>
+    <line x1="550" y1="70" x2="550" y2="86" stroke="#11161c"/>
+    <!-- 分支头(底部 132) -->
+    <rect x="60" y="86" width="220" height="46" rx="5" fill="#f3f5f7" stroke="#11161c"/>
+    <text x="170" y="106" text-anchor="middle" class="blb">一 · 把缓存做小</text>
+    <text x="170" y="122" text-anchor="middle" class="bl" style="fill:#e5484d">改结构 / 改数据</text>
+    <rect x="440" y="86" width="220" height="46" rx="5" fill="#f3f5f7" stroke="#11161c"/>
+    <text x="550" y="106" text-anchor="middle" class="blb">二 · 把缓存管好</text>
+    <text x="550" y="122" text-anchor="middle" class="bl" style="fill:#e5484d">改放置 / 改调度</text>
+    <!-- 主干竖线:自分支头底 132 向下至最后一框中心 -->
+    <line x1="80" y1="132" x2="80" y2="338" stroke="#cbb"/>
+    <line x1="640" y1="132" x2="640" y2="338" stroke="#cbb"/>
+    <!-- 左列三框:中心 168/238/308,框高48 → 顶144 不压分支头(底132) -->
+    ${[['共享 · 压缩 K、V','MQA · GQA · MLA',168],['量化降精度','INT8 · FP8 · INT4',238],['少存 token','窗口 · Streaming · H2O',308]].map(([t,m,cy])=>`
+      <line x1="80" y1="${cy}" x2="100" y2="${cy}" stroke="#cbb"/>
+      <rect x="100" y="${cy-24}" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"/>
+      <text x="118" y="${cy-4}" class="blb">${t}</text>
+      <text x="118" y="${cy+14}" class="bl">${m}</text>`).join('')}
+    <!-- 右列三框 -->
+    ${[['分页管理显存','PagedAttention',168],['跨请求复用','前缀缓存 · RadixTree',238],['卸载 · 调度','分级卸载 · PD 分离',308]].map(([t,m,cy])=>`
+      <line x1="620" y1="${cy}" x2="640" y2="${cy}" stroke="#cbb"/>
+      <rect x="420" y="${cy-24}" width="200" height="48" rx="5" fill="#fff" stroke="#11161c"/>
+      <text x="438" y="${cy-4}" class="blb">${t}</text>
+      <text x="438" y="${cy+14}" class="bl">${m}</text>`).join('')}
+    <!-- 脚注:最后框底 332,线在 360 -->
+    <line x1="40" y1="362" x2="680" y2="362" stroke="#e7eaee"/>
+    <text x="40" y="384" class="bl">左途三类:改模型,需重训,质量有取舍 ── 三/四选一</text>
+    <text x="40" y="404" class="bl">右途三类:纯引擎,不动模型,输出不变 ── 可叠加全开 · 量化居中可乘性叠加</text>
+  </svg>`,
+
+  attribution:`<svg viewBox="0 0 720 280">
+    <text x="40" y="24" class="bl">显存 =  L · S · n<tspan baseline-shift="sub" font-size="8">kv</tspan>·d · B · p   ——   攻击其中可变的三项</text>
+    <line x1="40" y1="40" x2="680" y2="40" stroke="#e7eaee"/>
+    ${[
+      ['S','序列长度','少存 token','窗口 · Streaming · H2O',130],
+      ['NKV','KV 头数','共享 / 压缩','MQA · GQA · MLA',370],
+      ['p','数值精度','量化','INT8 · FP8 · INT4',610]
+    ].map(([s,c,t,m,cx])=>{
+      const sym = s==='NKV' ? 'n<tspan baseline-shift="sub" font-size="9">kv</tspan>·d' : s;
+      return `
+      <rect x="${cx-90}" y="58" width="180" height="44" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"/>
+      <text x="${cx}" y="78" text-anchor="middle" class="blb" style="fill:#e5484d">缩 ${sym}</text>
+      <text x="${cx}" y="94" text-anchor="middle" class="bl">${c}</text>
+      <line x1="${cx}" y1="102" x2="${cx}" y2="128" stroke="#11161c"/>
+      <rect x="${cx-90}" y="128" width="180" height="50" rx="4" fill="#fff" stroke="#11161c"/>
+      <text x="${cx}" y="149" text-anchor="middle" class="blb">${t}</text>
+      <text x="${cx}" y="167" text-anchor="middle" class="bl">${m}</text>`;
+    }).join('')}
+    <line x1="40" y1="206" x2="680" y2="206" stroke="#e7eaee"/>
+    <text x="40" y="228" class="bl">系统层(分页 / 前缀 / 卸载)不缩任何因子 ── 故不在此图 ── 只优化字节如何安放与复用</text>
+    <text x="40" y="250" class="bl" style="fill:#7b8794">L(层)与 B(批)一般不在缓存层优化:前者固定,后者由系统调度</text>
+  </svg>`,
+
+  lineage:`<svg viewBox="0 0 720 440">
+    <text x="40" y="22" class="blb">谱系一 · 注意力结构的演进</text>
+    <text x="40" y="40" class="bl">MHA 为根,三种后继沿"越来越省"的方向展开 · 同一维度,四选其一</text>
+    <!-- 省显存方向轴 -->
+    <line x1="60" y1="62" x2="660" y2="62" stroke="#cbb"/><polygon points="660,62 652,58 652,66" fill="#cbb"/>
+    <text x="62" y="56" class="bl" style="fill:#7b8794">缓存大</text><text x="658" y="56" text-anchor="end" class="bl" style="fill:#7b8794">缓存小</text>
+    <!-- 四个结构框,等距单行 -->
+    ${[
+      ['MHA','2017','每头独立 K/V','基线',40],
+      ['MQA','2019','全头共享 1 组','最省·质量降',210],
+      ['GQA','2023','分组共享','折中·可迁移',380],
+      ['MLA','2024','低秩潜向量','压缩狠·质量佳',550]
+    ].map(([n,y,a,b,x],i)=>`
+      <rect x="${x}" y="78" width="130" height="54" rx="5" fill="${n==='MHA'?'#fff':(n==='GQA'?'#f3f5f7':'#fff')}" stroke="#11161c" stroke-width="${n==='MHA'?1.5:1}"/>
+      <text x="${x+65}" y="99" text-anchor="middle" class="blb">${n}</text>
+      <text x="${x+65}" y="116" text-anchor="middle" class="bl">${y} · ${a}</text>
+      <text x="${x+65}" y="152" text-anchor="middle" class="bl" style="fill:#7b8794">${b}</text>`).join('')}
+    <!-- 串联箭头:相邻框之间,统一在 y=105 -->
+    ${[170,340,510].map(x=>`<line x1="${x}" y1="105" x2="${x+40}" y2="105" stroke="#11161c"/><polygon points="${x+40},105 ${x+32},101 ${x+32},109" fill="#11161c"/>`).join('')}
+    <!-- GQA 标配角标 -->
+    <text x="445" y="174" text-anchor="middle" class="bl" style="fill:#e5484d">← 当今开源标配</text>
+    <!-- 分隔 -->
+    <line x1="40" y1="200" x2="680" y2="200" stroke="#e7eaee"/>
+    <!-- 谱系二:系统层 -->
+    <text x="40" y="224" class="blb">谱系二 · 系统层技术(正交于结构,可叠加)</text>
+    <text x="40" y="242" class="bl">不改模型、即插即用 · 虚线表示"叠加在所选结构之上"</text>
+    <!-- 基座 -->
+    <rect x="110" y="258" width="500" height="38" rx="5" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"/>
+    <text x="360" y="281" text-anchor="middle" class="bl">基座:上方任选一种结构(MHA / GQA / MLA …)</text>
+    <!-- 四个系统层模块,均匀分布,虚线垂直连到基座 -->
+    ${[['量化','降精度',90],['分页','PagedAttn',243],['前缀缓存','跨请求复用',396],['卸载 / PD','扩容·分工',549]].map(([t,m,x])=>`
+      <line x1="${x+62}" y1="296" x2="${x+62}" y2="332" stroke="#cbb" stroke-dasharray="3 3"/>
+      <rect x="${x}" y="332" width="124" height="50" rx="5" fill="#fff" stroke="#11161c"/>
+      <text x="${x+62}" y="354" text-anchor="middle" class="blb">${t}</text>
+      <text x="${x+62}" y="372" text-anchor="middle" class="bl">${m}</text>`).join('')}
+    <text x="40" y="414" class="bl" style="fill:#e5484d">上层四选一(改结构、需重训) · 下层可全开(纯引擎、即插即用) · 量化乘性叠加于任意结构</text>
+  </svg>`,
+
+  timeline:`<svg viewBox="0 0 720 410">
+    <text x="40" y="22" class="blb">一次请求的时间轴(按比例:prefill 短,decode 长)</text>
+    <line x1="200" y1="44" x2="680" y2="44" stroke="#cbb"/><polygon points="680,44 672,40 672,48" fill="#cbb"/>
+    <text x="676" y="38" text-anchor="end" class="bl" style="fill:#7b8794">时间 →</text>
+    <!-- prefill 块 -->
+    <rect x="200" y="56" width="130" height="52" rx="5" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"/>
+    <text x="265" y="78" text-anchor="middle" class="blb">Prefill</text><text x="265" y="95" text-anchor="middle" class="bl">并行读 prompt</text>
+    <!-- decode 块 -->
+    <rect x="338" y="56" width="342" height="52" rx="5" fill="#fff" stroke="#11161c" stroke-width="1.5"/>
+    <text x="509" y="78" text-anchor="middle" class="blb">Decode</text><text x="509" y="95" text-anchor="middle" class="bl">逐 token 生成,每步读全部 KV</text>
+    ${Array.from({length:9}).map((_,i)=>`<line x1="${370+i*34}" y1="56" x2="${370+i*34}" y2="108" stroke="#eef1f4"/>`).join('')}
+    <text x="265" y="128" text-anchor="middle" class="bl" style="fill:#e5484d">算力受限</text>
+    <text x="509" y="128" text-anchor="middle" class="bl" style="fill:#e5484d">显存带宽受限</text>
+    <line x1="40" y1="146" x2="680" y2="146" stroke="#e7eaee"/>
+    <text x="40" y="168" class="bl">各技术的作用区间(左为名称,右侧条形覆盖其生效阶段):</text>
+    <!-- 左名称列 + 右区间条;prefill 区 200-330, decode 区 338-680, 全程 200-680 -->
+    ${[
+      ['前缀缓存','降 TTFT',200,130,186],
+      ['分块预填充','削峰值',200,130,212],
+      ['MQA/GQA/MLA','解码提速',338,342,238],
+      ['量化','解码提速',338,342,264],
+      ['窗口 / 淘汰','控缓存',338,342,290],
+      ['PagedAttention','全程放置',200,480,316],
+      ['分级卸载','全程迁移',200,480,342]
+    ].map(([t,d,bx,bw,y])=>`
+      <text x="40" y="${y+14}" class="blb">${t}</text>
+      <rect x="${bx}" y="${y}" width="${bw}" height="20" rx="3" fill="${bx>=338?'#fff':(bw>400?'#faf0ec':'#f3f5f7')}" stroke="#11161c"/>
+      <text x="${bx+bw/2}" y="${y+14}" text-anchor="middle" class="bl" style="fill:#7b8794">${d}</text>`).join('')}
+    <line x1="40" y1="376" x2="680" y2="376" stroke="#e7eaee"/>
+    <text x="40" y="398" class="bl" style="fill:#e5484d">缩缓存的技术虽在 decode 见效,但缓存于 prefill 即建好;前缀缓存只降 TTFT,不触及 decode 速度</text>
+  </svg>`,
+
+  arch:`<svg viewBox="0 0 720 460">
+    <text x="40" y="18" class="bl">现代 LLM 推理系统 · KV Cache 为中心的数据流</text>
+    <!-- 请求入口 -->
+    <rect x="40" y="34" width="130" height="40" rx="4" fill="none" stroke="#11161c"/><text x="105" y="52" text-anchor="middle" class="blb">请求队列</text><text x="105" y="67" text-anchor="middle" class="bl">prompts in</text>
+    <line x1="170" y1="54" x2="220" y2="54" stroke="#11161c"/><polygon points="220,54 213,50 213,58" fill="#11161c"/>
+    <!-- 调度器 -->
+    <rect x="220" y="34" width="160" height="40" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"/><text x="300" y="52" text-anchor="middle" class="blb">调度器 Scheduler</text><text x="300" y="67" text-anchor="middle" class="bl">连续批处理 · 分块预填充</text>
+    <line x1="380" y1="54" x2="430" y2="54" stroke="#11161c"/><polygon points="430,54 423,50 423,58" fill="#11161c"/>
+    <!-- 前缀匹配 -->
+    <rect x="430" y="34" width="160" height="40" rx="4" fill="none" stroke="#11161c"/><text x="510" y="52" text-anchor="middle" class="blb">前缀匹配</text><text x="510" y="67" text-anchor="middle" class="bl">RadixTree / Hash 命中复用</text>
+    <!-- KV 管理器中枢 -->
+    <rect x="200" y="120" width="320" height="56" rx="4" fill="#fff" stroke="#e5484d" stroke-width="1.5"/><text x="360" y="142" text-anchor="middle" class="blb" style="fill:#e5484d">KV Cache 管理器(PagedAttention)</text><text x="360" y="160" text-anchor="middle" class="bl">块表映射 · 写时复制 · 按需分配 · 跨请求共享</text>
+    <line x1="300" y1="74" x2="330" y2="120" stroke="#11161c" stroke-dasharray="3 3"/><line x1="510" y1="74" x2="400" y2="120" stroke="#11161c" stroke-dasharray="3 3"/>
+    <!-- 存储层级 -->
+    <text x="40" y="210" class="bl">分级存储(以带宽换容量)</text>
+    <rect x="40" y="220" width="180" height="56" rx="4" fill="#fff" stroke="#11161c"/><text x="130" y="242" text-anchor="middle" class="blb">GPU 显存(HBM)</text><text x="130" y="260" text-anchor="middle" class="bl">活跃块 · TB/s</text>
+    <rect x="250" y="220" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#cbb"/><text x="340" y="242" text-anchor="middle" class="blb">CPU 内存</text><text x="340" y="260" text-anchor="middle" class="bl">温块卸载 · ~数十 GB/s</text>
+    <rect x="460" y="220" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#cbb"/><text x="550" y="242" text-anchor="middle" class="blb">磁盘 / NVMe / 远端池</text><text x="550" y="260" text-anchor="middle" class="bl">冷块 · Mooncake 式</text>
+    <line x1="360" y1="176" x2="130" y2="220" stroke="#11161c"/><polygon points="130,220 134,212 138,221" fill="#11161c"/>
+    <line x1="220" y1="248" x2="250" y2="248" stroke="#cbb" stroke-dasharray="3 3"/><polygon points="250,248 243,244 243,252" fill="#7b8794"/>
+    <line x1="430" y1="248" x2="460" y2="248" stroke="#cbb" stroke-dasharray="3 3"/><polygon points="460,248 453,244 453,252" fill="#7b8794"/>
+    <!-- PD 分离 -->
+    <line x1="40" y1="306" x2="680" y2="306" stroke="#e7eaee"/>
+    <text x="40" y="328" class="bl">PD 分离(大规模部署可选)</text>
+    <rect x="120" y="340" width="180" height="48" rx="4" fill="#f3f5f7" stroke="#11161c"/><text x="210" y="360" text-anchor="middle" class="blb">Prefill 池</text><text x="210" y="376" text-anchor="middle" class="bl">算力密集 GPU</text>
+    <rect x="420" y="340" width="180" height="48" rx="4" fill="#fff" stroke="#11161c"/><text x="510" y="360" text-anchor="middle" class="blb">Decode 池</text><text x="510" y="376" text-anchor="middle" class="bl">带宽密集 GPU</text>
+    <line x1="300" y1="364" x2="420" y2="364" stroke="#e5484d"/><polygon points="420,364 412,360 412,368" fill="#e5484d"/>
+    <text x="360" y="356" text-anchor="middle" class="bl" style="fill:#e5484d">KV 传输</text><text x="360" y="382" text-anchor="middle" class="bl">NVLink / RDMA</text>
+    <text x="40" y="430" class="bl" style="fill:#7b8794">注:实线 = 数据流 · 虚线 = 块的迁移/映射 · 红 = 以 KV 为中心的关键路径</text>
+  </svg>`,
+
+  decision:`<svg viewBox="0 0 720 360">
+    <text x="40" y="20" class="bl">决策:面对约束,优先考虑哪些技术</text>
+    <rect x="280" y="34" width="160" height="40" rx="4" fill="#f3f5f7" stroke="#11161c" stroke-width="1.5"/><text x="360" y="54" text-anchor="middle" class="blb">你的首要约束?</text><text x="360" y="68" text-anchor="middle" class="bl">start here</text>
+    ${[
+      ['显存装不下','改结构(若可重训):GQA/MLA','否则推理期:量化 + 卸载',80],
+      ['并发上不去','PagedAttention + 连续批处理','(纯引擎,先做这个)',280],
+      ['首字延迟高','前缀缓存(若多请求共享前缀)','+ 分块预填充',480]
+    ].map(([q,a1,a2,x],i)=>`
+      <line x1="360" y1="74" x2="${x+80}" y2="110" stroke="#11161c"/>
+      <rect x="${x}" y="110" width="160" height="40" rx="4" fill="none" stroke="#e5484d"/><text x="${x+80}" y="130" text-anchor="middle" class="blb" style="fill:#e5484d">${q}</text><text x="${x+80}" y="145" text-anchor="middle" class="bl">场景</text>
+      <line x1="${x+80}" y1="150" x2="${x+80}" y2="176" stroke="#cbb" stroke-dasharray="3 3"/>
+      <rect x="${x-10}" y="176" width="180" height="56" rx="4" fill="#f8f9fb" stroke="#11161c"/><text x="${x+80}" y="198" text-anchor="middle" class="bl">${a1}</text><text x="${x+80}" y="216" text-anchor="middle" class="bl">${a2}</text>`).join('')}
+    <line x1="40" y1="270" x2="680" y2="270" stroke="#e7eaee"/>
+    <text x="40" y="292" class="bl">超长上下文且需精确回看 → 全缓存 + 卸载 + 量化(勿用淘汰类,有损)</text>
+    <text x="40" y="312" class="bl">超长上下文但可容遗忘(流式)→ StreamingLLM / 窗口注意力</text>
+    <text x="40" y="332" class="bl" style="fill:#e5484d">通则:右途(系统)先全开,左途(结构)按训练条件择一,量化按精度预算叠加</text>
+  </svg>`
+};
+
+const FIGS = {
+  share:`<svg viewBox="0 0 560 165"><text x="70" y="16" text-anchor="middle" class="blb">MHA</text><text x="215" y="16" text-anchor="middle" class="blb">GQA(2组)</text><text x="370" y="16" text-anchor="middle" class="blb">MQA</text><text x="490" y="16" text-anchor="middle" class="blb">MLA</text>
+    <g>${[0,1,2,3].map(i=>`<rect x="${36+i*20}" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"/><rect x="${36+i*20}" y="66" width="15" height="15" rx="2" fill="#7a3b2e"/><line x1="${43+i*20}" y1="49" x2="${43+i*20}" y2="66" stroke="#cbbb9c"/>`).join('')}<text x="70" y="100" text-anchor="middle" class="bl">4 头·4 组KV</text></g>
+    <g>${[0,1,2,3].map(i=>`<rect x="${165+i*20}" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"/>`).join('')}${[0,1].map(i=>`<rect x="${173+i*40}" y="66" width="15" height="15" rx="2" fill="#3d5a45"/>`).join('')}<line x1="172" y1="49" x2="180" y2="66" stroke="#cbbb9c"/><line x1="192" y1="49" x2="180" y2="66" stroke="#cbbb9c"/><line x1="212" y1="49" x2="220" y2="66" stroke="#cbbb9c"/><line x1="232" y1="49" x2="220" y2="66" stroke="#cbbb9c"/><text x="215" y="100" text-anchor="middle" class="bl">4 头·2 组KV</text></g>
+    <g>${[0,1,2,3].map(i=>`<rect x="${325+i*20}" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"/>`).join('')}<rect x="355" y="66" width="15" height="15" rx="2" fill="#9a7b3f"/>${[0,1,2,3].map(i=>`<line x1="${332+i*20}" y1="49" x2="362" y2="66" stroke="#cbbb9c"/>`).join('')}<text x="370" y="100" text-anchor="middle" class="bl">4 头·1 组KV</text></g>
+    <g>${[0,1,2,3].map(i=>`<rect x="${455+i*20}" y="34" width="15" height="15" rx="2" fill="#ece2cd" stroke="#caa"/>`).join('')}<rect x="481" y="66" width="22" height="15" rx="2" fill="#3d5a45"/>${[0,1,2,3].map(i=>`<line x1="${462+i*20}" y1="49" x2="492" y2="66" stroke="#cbbb9c"/>`).join('')}<text x="492" y="100" text-anchor="middle" class="bl">潜向量 c</text></g>
+    <text x="280" y="130" text-anchor="middle" class="bl">上排 = Query 头   下排 = 需缓存的 K/V   ——   由左至右愈省</text>
+    <text x="280" y="150" text-anchor="middle" class="bl" style="fill:#9a7b3f;font-style:italic">缓存量 ∝ 下排方块数</text></svg>`,
+  quant:`<svg viewBox="0 0 560 130"><text x="40" y="22" class="blb">FP16</text>${Array.from({length:16}).map((_,i)=>`<rect x="${100+i*10}" y="12" width="8" height="15" rx="1" fill="#7a3b2e"/>`).join('')}<text x="280" y="23" class="bl">16 bit/数 · 基线</text>
+    <text x="40" y="62" class="blb">INT8</text>${Array.from({length:8}).map((_,i)=>`<rect x="${100+i*10}" y="52" width="8" height="15" rx="1" fill="#9a7b3f"/>`).join('')}<text x="195" y="63" class="bl">8 bit · ÷2</text>
+    <text x="40" y="102" class="blb">INT4</text>${Array.from({length:4}).map((_,i)=>`<rect x="${100+i*10}" y="92" width="8" height="15" rx="1" fill="#3d5a45"/>`).join('')}<text x="155" y="103" class="bl">4 bit · ÷4(需校准离群值)</text></svg>`,
+  evict:`<svg viewBox="0 0 560 140"><text x="14" y="20" class="bl">纯滑动窗口 — 开头被挤出 → 注意力沉没失守 → 崩溃</text>${Array.from({length:16}).map((_,i)=>`<rect x="${14+i*16}" y="30" width="13" height="16" rx="2" fill="${i<4?'#e3d7be':(i>=10?'#7a3b2e':'#e3d7be')}" stroke="#cbbb9c"/>`).join('')}<text x="290" y="42" class="bl" style="fill:#7a3b2e">✕</text>
+    <text x="14" y="82" class="bl">StreamingLLM — 永久保留开头 sink 锚点 + 近期窗口</text>${Array.from({length:16}).map((_,i)=>`<rect x="${14+i*16}" y="92" width="13" height="16" rx="2" fill="${(i<2||i>=10)?'#3d5a45':'#e3d7be'}" stroke="#cbbb9c"/>`).join('')}<text x="290" y="104" class="bl" style="fill:#3d5a45">✓ 稳定</text>
+    <text x="14" y="132" class="bl" style="fill:#9a7b3f;font-style:italic">深色=保留于缓存 · 浅色=已驱逐 · H2O 则按累计注意力分数动态择"深色"</text></svg>`,
+  paged:`<svg viewBox="0 0 560 140"><text x="14" y="20" class="bl">传统连续预留 — 阴影为预留却用不上的内部碎片</text><rect x="14" y="28" width="280" height="20" rx="3" fill="none" stroke="#cbbb9c"/><rect x="16" y="30" width="100" height="16" rx="2" fill="#3d5a45"/><rect x="118" y="30" width="174" height="16" fill="#e3d7be"/><text x="360" y="42" class="bl" style="fill:#7a3b2e">↑ 浪费</text>
+    <text x="14" y="86" class="bl">PagedAttention — 切块按需分配,可跨请求共享,几无碎片</text>${Array.from({length:12}).map((_,i)=>`<rect x="${14+i*22}" y="94" width="18" height="18" rx="2" fill="${[0,1,3,4,5,7,8,10].includes(i)?'#9a7b3f':'#e3d7be'}" stroke="#cbbb9c"/>`).join('')}<text x="360" y="107" class="bl" style="fill:#9a7b3f">块 = 16/32 token</text></svg>`,
+  prefix:`<svg viewBox="0 0 560 140">${['A','B','C'].map((r,ri)=>`<text x="14" y="${40+ri*30}" class="blb">${r}</text>${Array.from({length:5}).map((_,i)=>`<rect x="${38+i*22}" y="${28+ri*30}" width="18" height="17" rx="2" fill="#3d5a45" stroke="#cbbb9c"/>`).join('')}${Array.from({length:3}).map((_,i)=>`<rect x="${38+(5+i)*22}" y="${28+ri*30}" width="18" height="17" rx="2" fill="#e3d7be" stroke="#cbbb9c"/>`).join('')}`).join('')}<text x="340" y="40" class="bl" style="fill:#3d5a45">墨绿 = 公共前缀</text><text x="340" y="60" class="bl" style="fill:#3d5a45">只计算一次,复用</text><text x="340" y="86" class="bl">浅色 = 各自续写</text><text x="14" y="130" class="bl" style="fill:#9a7b3f;font-style:italic">命中相同前缀 → 跳过其重复 prefill,直降 TTFT</text></svg>`,
+  offload:`<svg viewBox="0 0 560 140"><rect x="24" y="34" width="130" height="58" rx="4" fill="rgba(61,90,69,.12)" stroke="#3d5a45"/><text x="89" y="58" text-anchor="middle" class="blb">GPU 显存</text><text x="89" y="76" text-anchor="middle" class="bl">TB/s · 小</text>
+    <rect x="215" y="34" width="130" height="58" rx="4" fill="rgba(154,123,63,.12)" stroke="#9a7b3f"/><text x="280" y="58" text-anchor="middle" class="blb">CPU 内存</text><text x="280" y="76" text-anchor="middle" class="bl">~数十GB/s · 中</text>
+    <rect x="406" y="34" width="130" height="58" rx="4" fill="rgba(122,59,46,.10)" stroke="#7a3b2e"/><text x="471" y="58" text-anchor="middle" class="blb">磁盘 / NVMe</text><text x="471" y="76" text-anchor="middle" class="bl">GB/s · 巨大</text>
+    <line x1="154" y1="63" x2="215" y2="63" stroke="#9a7b3f" stroke-dasharray="4 3"/><polygon points="215,63 207,59 207,67" fill="#9a7b3f"/><line x1="345" y1="63" x2="406" y2="63" stroke="#7a3b2e" stroke-dasharray="4 3"/><polygon points="406,63 398,59 398,67" fill="#7a3b2e"/>
+    <text x="280" y="120" text-anchor="middle" class="bl" style="fill:#9a7b3f;font-style:italic">PCIe ≈ 32GB/s vs 显存 TB/s — 差两个数量级,预取须掩盖搬运</text></svg>`
+};
+
+PAGES.push({type:'cover'});
+PAGES.push({type:'toc'});
+PAGES.push({type:'html',rh:['绪论','KV Cache 之必要'],title:'绪论',body:`
+  <div class="chap-no">绪 论 · Prolegomena</div>
+  <div class="chap-title">为何缓存,缓存何物</div>
+  <div class="chap-sub">从自回归生成的重复计算,到一道主宰推理成本的显存公式</div>
+  <p class="drop">大语言模型生成文本的方式是<b>自回归</b>的:模型一次只吐出一个 token,再将其接回输入,据以生成下一个。朴素地实现这一过程,意味着每生成一个新 token,都要把整段已有序列重新送入网络——第一百个 token 诞生时,前九十九个 token 的全部注意力都被重算一遍。计算量随生成长度呈平方级累积,绝大部分是冗余的。</p>
+  <p>症结的破解,藏在注意力机制的一个朴素事实里。每个 token 进入注意力层时,会被投影为三个向量:查询 <code>Q</code>、键 <code>K</code>、值 <code>V</code>。当前 token 用它的 <code>Q</code> 去和所有历史 token 的 <code>K</code> 做匹配,再据此加权聚合它们的 <code>V</code>。关键在于:<b>对一个已经处理过的 token,它的 K 与 V 是恒定的</b>——无论其后再接什么,都不会改变。</p>
+  <div class="marginalia"><div class="mk">§</div><div class="mtext">KV Cache 的全部精神,可凝为一句:已算之物,不再重算。它是一次以空间换时间的经典权衡。</div></div>
+  <p>于是有了 <b>KV Cache</b>:把每一层、每个已生成 token 的 K 与 V 缓存于显存。生成新 token 时,只需为它自己计算 Q、K、V,将新的 K、V 追加入缓存,再令其 Q 与缓存中全部 K、V 作注意力。每一步的代价,遂从"重处理整个序列"坍缩为"处理一个 token,外加一次查表"。</p>
+  <h3>那道主宰一切的公式</h3>
+  <p>天下无免费之事。这份加速的代价是显存。一个请求所占的 KV Cache,其字节数可精确写出:</p>
+  <div class="theorem"><div class="tname">定义 0.1 — KV Cache 显存占用</div>
+  $$\\text{Bytes}=\\underbrace{2}_{K,\\,V}\\times L\\times S\\times n_{kv}\\times d_{head}\\times B\\times p$$
+  <div class="note">L 层数,S 序列长度,n_kv 为 KV 头数,d_head 每头维度,B 批大小,p 每元素字节数。开头之 2,因 K 与 V 须分别存储。</div></div>
+  <p>这道公式是整篇文章的主线。<b>后面要讲的每一项技术,无非是在攻击其中某一个因子,或优化这批字节在存储层级中的安放方式。</b>它随序列长度与并发数线性膨胀;在长上下文之下,它甚至超过模型权重本身。</p>
+  <div class="aside insight"><span class="al">实例 · 让数字说话</span>取 Llama-2-7B(MHA):<i>L</i>=32,<i>n_head</i>=32,<i>d_head</i>=128,FP16(<i>p</i>=2)。单个 token 的缓存为 $2\\times32\\times32\\times128\\times2=1\\,\\text{MB}$。于是 4096 token 的上下文需 <b>约 4 GB</b>;当 batch=8,飙至 <b>32 GB</b>——已逼近乃至超过 7B 权重本身的约 14 GB。缓存,而非权重,成了长上下文服务的真正瓶颈。</div>
+  <h3>全文的地图</h3>
+  <p>面对这道公式,优化分作泾渭分明的两途。其一,<b>把缓存做小</b>:通过共享、压缩、降精度、或干脆少存,削减公式中的因子——此途多需改动模型结构。其二,<b>把缓存管好</b>:数据量不变,而优化其在显存中如何安放、如何跨请求复用、如何在存储层级间迁移——此途纯属推理引擎之事,不动模型分毫。</p>
+  <div class="marginalia"><div class="mk">❡</div><div class="mtext">左途偏"结构",右途偏"系统"。量化独立于二者之间。这一区分,亦回答了"KV Cache 是否模型的一部分"之问——见尾章。</div></div>
+  <div class="plate" style="margin-top:30px">${MAPS.overview}<div class="fcap"><b>图 0.2</b>技术全景知识地图 ── 一根、两途、六类</div></div>\n  <div class="plate">${MAPS.attribution}<div class="fcap"><b>图 0.3</b>显存公式归因 ── 每项技术攻击哪个因子</div></div>\n  <p>下面分两大部分展开:前三节讲"做小",后三节讲"管好",每节都能单独读。我们先从缓存里最庞大的那一维——头数——讲起。</p>
+`});
+
+PAGES.push({type:'chapter',n:'01',rh:['第一章','共享与压缩 K、V'],
+  title:'共享与压缩 K、V',sub:'MQA · GQA · MLA —— 向 KV 头数 $n_{kv}$ 开刀',fig:'share',
+  quote:'与其每个注意力头都存一份 K、V,不如让它们共享。',
+  body:`
+  <p class="drop">显存公式中,随头数线性增长的 $n_{kv}\\cdot d_{head}$ 一项,往往是缓存里最肥厚的一维。标准多头注意力(MHA)令每个注意力头各执一组独立的 K、V;这一节的三种技术,皆在追问同一件事:这些头,能否共用更少的 K、V?</p>
+  <h3>四种方案,只在 $n_{kv}$ 上分野</h3>
+  <p>设 Query 头总数为 $h$。MHA、GQA、MQA、MLA 的全部差异,可压缩进一张表——它们对缓存的影响,完全由 $n_{kv}$ 决定。</p>
+  <table class="booktable"><caption>表 1.1 — 四种注意力变体的缓存对比</caption>
+  <tr><th>方案</th><th>$n_{kv}$</th><th>相对 MHA 缓存</th><th>代表模型</th></tr>
+  <tr><td>MHA</td><td>$h$</td><td>$1\\times$</td><td>GPT-3,早期 LLaMA</td></tr>
+  <tr><td>GQA</td><td>$g$(组数)</td><td>$g/h$</td><td>Llama 2/3 70B,Qwen2</td></tr>
+  <tr><td>MQA</td><td>$1$</td><td>$1/h$</td><td>PaLM,Falcon</td></tr>
+  <tr><td>MLA</td><td>潜维 $d_c$</td><td>$\\approx d_c/(h\\,d_{head})$</td><td>DeepSeek-V2/V3</td></tr></table>
+  <h3>何以独惠解码?——算术强度之辩</h3>
+  <p>欲明此类技术之价值,须辨 prefill 与 decode 之别。解码阶段每步仅生成一个 token,其计算量微乎其微,却须将<b>整个 KV Cache 自显存读出</b>方能作注意力。其<b>算术强度</b>(每字节访存所摊的浮点运算)极低,是彻底的访存受限(memory-bound)。</p>
+  <div class="theorem"><div class="tname">命题 1.1 — 解码受限于带宽</div>
+  $$t_{\\text{decode-step}}\\approx\\frac{\\text{KV Cache 字节数}}{\\text{显存带宽}}$$
+  <div class="note">解码每步耗时近似正比于缓存大小。故缓存缩小 4×,解码吞吐可近似提升至 4×——收益源于"少搬字节",而非"少算"。</div></div>
+  <div class="aside insight"><span class="al">洞见</span>这解释了一个常令初学者困惑之事:GQA 几乎不减少 FLOPs,为何却能大幅加速?因为它压根不在算力上较劲,而在每一步解码须搬运的字节数上。瓶颈被挪走了。</div>
+  <h3>三法详陈</h3>
+  <h4>MQA — 极简的共享</h4>
+  <p>Shazeer 于 2019 年提出。所有 Query 头共享<b>同一组</b> K、V,$n_{kv}=1$。缓存压至 $1/h$,最为彻底。代价是表达力的明显折损——在大模型上,质量下降可被感知。</p>
+  <h4>GQA — 折中,且可低成本迁移</h4>
+  <p>Ainslie 等于 2023 年提出。将 $h$ 个头分作 $g$ 组,组内共享一组 K、V,介于 MHA($g{=}h$)与 MQA($g{=}1$)之间。其真正的工程价值,在于一项迁移之术:</p>
+  <div class="aside insight"><span class="al">洞见 · Uptraining</span>已训成的 MHA 模型,可将同组各头的 K/V 投影做<b>均值池化</b>以初始化 GQA,再以约原预训练 <b>5%</b> 的算力继续训练,质量即可基本恢复。这使 GQA 近乎零成本落地,遂成今日开源模型之标配。</div>
+  <h4>MLA — 低秩压缩的潜向量</h4>
+  <p>DeepSeek-V2 之创制。它不走共享之路,而行<b>低秩压缩</b>:将每个 token 投影为一个低维潜向量 $c_{kv}\\in\\mathbb{R}^{d_c}$(其中 $d_c\\ll h\\,d_{head}$)存入缓存,作注意力时再以上投影矩阵还原各头的 K、V。</p>
+  <div class="theorem"><div class="tname">式 1.2 — MLA 的压缩与还原</div>
+  $$c_{kv}=W^{DKV}h_t,\\qquad k^{(i)}=W^{UK}_i c_{kv},\\quad v^{(i)}=W^{UV}_i c_{kv}$$
+  <div class="note">仅缓存低维 c_kv,而非 h 组高维 K/V。上投影矩阵 W^{UK}、W^{UV} 可被吸收进相邻权重,推理时几乎不增算力。</div></div>
+  <div class="aside pitfall"><span class="al">陷阱 · 解耦 RoPE</span>低秩压缩与旋转位置编码(RoPE)不可交换——RoPE 须作用于真正的 K,而 MLA 缓存的是压缩前的 c_kv,二者无法直接相容。DeepSeek 之解,谓之 <b>decoupled RoPE</b>:额外辟出一小束专司位置的维度,与压缩部分解耦并行。此乃 MLA 实现中最易疏漏之处。</div>
+  <h3>矩阵吸收:MLA 不增算力的玄机</h3>
+  <p>读者或疑:还原 K、V 既需上投影,岂不徒增计算?玄机在于<b>矩阵吸收</b>。注意力中 $q^\\top k = q^\\top W^{UK} c_{kv}$,可将 $W^{UK}$ 预先并入 Query 投影 $W^Q$,令 $\\tilde W^Q = (W^{UK})^\\top W^Q$;输出端 $W^{UV}$ 同理可并入输出投影。如此,上投影从未在运行时显式发生,缓存却始终只是那一个小小的 $c_{kv}$。</p>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>缓存随 $n_{kv}$ 线性下降:GQA-8 组约为基线 1/4,MQA 约 1/h,MLA 更低;且 DeepSeek 实测质量不降反升。</div><div class="con"><h5>所偿者</h5>共享愈烈,表达力损失愈显;MLA 实现繁复(解耦 RoPE、矩阵吸收);且皆须于训练期采用,不可对既有权重即插即用——GQA 的 uptraining 是唯一低成本旁门。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Fast Transformer Decoding: One Write-Head is All You Need</b> · <span>Shazeer, 2019</span></div>
+  <div class="p"><b>GQA: Training Generalized Multi-Query Transformer Models from MHA Checkpoints</b> · <span>Ainslie et al., 2023</span></div>
+  <div class="p"><b>DeepSeek-V2: A Strong, Economical, and Efficient MoE LM</b> · <span>DeepSeek-AI, 2024</span></div></div>
+`});
+
+PAGES.push({type:'chapter',n:'02',rh:['第二章','量化降精度'],
+  title:'量化降精度',sub:'向 precision 一项开刀 —— 与结构正交的乘性优化',fig:'quant',
+  quote:'十六位浮点存的本就不是精确值,那为何不用更少的位?',
+  body:`
+  <p class="drop">前一章削的是缓存里 K、V 的<b>数量</b>;这一节削的是每个数值的<b>位宽</b>。量化将 K、V 从 FP16/BF16 的十六位,映射至 INT8、FP8 乃至 INT4。它直击公式中的 $p$ 项,且因其作用于"每个数",故能<b>乘性地</b>叠加于任意结构(GQA、MLA)之上——这是它最可贵的品性。</p>
+  <h3>量化的基本算术</h3>
+  <p>以非对称整数量化为例,将浮点张量 $x$ 映射至 $b$ 位整数:</p>
+  <div class="theorem"><div class="tname">式 2.1 — 仿射量化</div>
+  $$s=\\frac{\\max(x)-\\min(x)}{2^b-1},\\quad z=\\Big\\lfloor-\\frac{\\min(x)}{s}\\Big\\rceil,\\quad q=\\Big\\lfloor\\frac{x}{s}\\Big\\rceil+z$$
+  <div class="note">s 为缩放因子,z 为零点。反量化 x̂ = s·(q − z)。对称量化则令 z = 0,牺牲一点范围利用率换取无零点的快路径。</div></div>
+  <h3>真正的难处:离群值</h3>
+  <p>KV Cache 量化远较权重量化棘手,根由在<b>离群值</b>:K、V 中少数通道的数值幅度远逾其余。若按整张量统一量化,这些离群值会把 $s$ 撑得极大,致使绝大多数寻常数值的有效位数被吞噬殆尽。量化的<b>粒度</b>遂成胜负手。</p>
+  <table class="booktable"><caption>表 2.1 — 量化粒度的权衡</caption>
+  <tr><th>粒度</th><th>一个 scale 所辖</th><th>抗离群</th><th>开销</th></tr>
+  <tr><td>per-tensor</td><td>整张量</td><td>最弱</td><td>最小</td></tr>
+  <tr><td>per-token</td><td>每 token 一组</td><td>中</td><td>小</td></tr>
+  <tr><td>per-channel</td><td>每通道一组</td><td>强</td><td>中</td></tr>
+  <tr><td>per-group</td><td>通道内再分小组</td><td>最强</td><td>较大</td></tr></table>
+  <div class="aside insight"><span class="al">洞见 · KIVI 之策</span>KIVI 的核心观察是:K 的离群值<b>固着于特定通道</b>,而 V 无此规律。故最优之策非一刀切,而是<b>K 按 per-channel、V 按 per-token</b> 分而治之。这一不对称处理,是高质量 2-bit KV 量化得以成立的关键。</div>
+  <h3>FP8 与 INT8:硬件的视角</h3>
+  <ul><li><b>INT8</b>:均匀量化,需 scale 与零点,对离群值敏感;然定点运算在旧硬件上更普及。</li>
+  <li><b>FP8</b>:有 <code>E4M3</code>(四位指数、三位尾数,范围窄而精度高)与 <code>E5M2</code>(范围宽而精度低)两式。浮点天然的非均匀分布更能从容容纳离群值;Hopper(H100)及其后世具原生 FP8 张量核,正使其成为推理之首选。</li></ul>
+  <div class="aside pitfall"><span class="al">陷阱 · 反量化的隐性开销</span>解码本是访存受限,量化减少搬运字节,本应提速;然每次注意力前,须将低位整数<b>反量化</b>回浮点。倘若此步未与注意力 kernel <b>融合(fused)</b>,额外的访存与转换反可吞掉全部收益。上乘的实现(如 FlashAttention 的量化变体)会将反量化压入 kernel 之内,与计算一气呵成。</div>
+  <p>量化亦是全文少数<b>既可于推理时施加、又可结合训练</b>的技术。正因如此,它在"改结构"与"改引擎"两途之间居中而立——这一点,尾章还将重提。</p>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>按位宽线性缩小:INT8 减半,INT4 减至四分之一。无需改动架构,推理时即可施加,且可叠加于 GQA、MLA 之上。</div><div class="con"><h5>所偿者</h5>精度损失随位宽递减而增;离群值须以细粒度驯服;反量化非经 kernel 融合则反受其累。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>KIVI: A Tuning-Free Asymmetric 2bit Quantization for KV Cache</b> · <span>Liu et al., 2024</span></div>
+  <div class="p"><b>KVQuant: Towards 10 Million Context Length LLM Inference</b> · <span>Hooper et al., 2024</span></div></div>
+`});
+
+PAGES.push({type:'chapter',n:'03',rh:['第三章','少存 token'],
+  title:'少存 token',sub:'缓存驱逐与稀疏 —— 把预算从 $O(S)$ 钉为 $O(1)$',fig:'evict',
+  quote:'序列再长,真正值得缓存的 token 其实没几个。',
+  body:`
+  <p class="drop">前两章削的是每个 token 的占用;这一节削的是 token 的<b>数目</b>。其立论是:注意力本质稀疏,<b>少数 token 贡献了绝大部分注意力质量</b>。既如此,何不只缓存这少数,从而将缓存复杂度由 $O(S)$ 一举钉为固定预算 $O(1)$?</p>
+  <h3>为何不能径直"只留最近 N 个"</h3>
+  <p>最朴素之法是纯滑动窗口,只保留最近的 N 个 token。然实践中,一旦最早的 token 被挤出缓存,模型质量便<b>断崖式崩塌</b>。StreamingLLM 给出了它的数学解释,根源在 softmax 的归一化约束:</p>
+  <div class="theorem"><div class="tname">式 3.1 — 注意力的归一化约束</div>
+  $$\\sum_{j=1}^{i}\\operatorname{softmax}\\!\\big(q_i\\cdot k_j\\big)=1$$
+  <div class="note">注意力权重被强制求和为一。纵使当前 token 并无实质可关注之物,这部分"多余"的注意力也必须有所倾倒。</div></div>
+  <p>模型于是习得一桩诡计:把这些多余的注意力,固定倾倒于<b>序列最初的几个 token</b> 之上——是为 <b>attention sink(注意力沉没)</b>。这几个 token 内容上往往无足轻重,却充当了 softmax 的泄压之阀。一旦它们被驱逐,注意力分布被迫重组,模型遂崩。</p>
+  <h3>二法分陈</h3>
+  <ul><li><b>StreamingLLM</b> — 永久保留<b>开头四个 sink token,外加最近窗口</b>,中间尽弃。如此,模型可于近乎无限长的流式输入上稳定生成,而显存恒定。</li>
+  <li><b>H2O(Heavy-Hitter Oracle)</b> — 立基于"少数 heavy hitter 主导注意力"之察。为每个 token 维护一份<b>累计注意力分数</b> $\\sum_t a_{t,j}$,缓存既满,贪心驱逐分数最低者,留 heavy hitter 与近期之 token。其择留乃<b>内容动态</b>所定,或为序列中部的某个题眼。</li></ul>
+  <div class="aside pitfall"><span class="al">陷阱 · 位置编码须重定</span>StreamingLLM 实现中最易错之处:缓存内的 token,须按其在<b>缓存中的相对位置</b>重新赋予位置编码,而非沿用其在原序列中的绝对位置。否则中间一段被驱逐后,位置序列出现空洞,位置编码错乱。</div>
+  <table class="booktable"><caption>表 3.1 — 四种少存策略</caption>
+  <tr><th>方法</th><th>择留依据</th><th>动态?</th><th>所长</th></tr>
+  <tr><td>滑动窗口</td><td>纯位置(最近)</td><td>否</td><td>局部任务</td></tr>
+  <tr><td>StreamingLLM</td><td>位置(首+近)</td><td>否</td><td>无限流式</td></tr>
+  <tr><td>H2O</td><td>累计注意力分</td><td>是</td><td>留住题眼</td></tr>
+  <tr><td>SnapKV</td><td>prompt 末段投票</td><td>是</td><td>长 prompt 压缩</td></tr></table>
+  <div class="aside insight"><span class="al">洞见 · 莫混淆"不崩"与"记得"</span>StreamingLLM 令模型在无限长输入上"不崩",但它<b>断不能令模型记住</b>被驱逐之内容——它为流式吞吐而生,非为无损长上下文而设。若任务需精确回溯任意历史细节(检索、长程推理),则当转投无损之途:全缓存,辅以卸载或量化。</div>
+  <div class="tradeoff"><div class="pro"><h5>所省者</h5>缓存钉于固定预算,与序列长度脱钩;理论上支撑无限流式生成,显存恒定不增。</div><div class="con"><h5>所偿者</h5>被驱逐之信息不可复得;对需回看任意历史的任务有损。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Efficient Streaming Language Models with Attention Sinks</b> · <span>Xiao et al., 2023</span></div>
+  <div class="p"><b>H2O: Heavy-Hitter Oracle for Efficient Generative Inference</b> · <span>Zhang et al., 2023</span></div>
+  <div class="p"><b>SnapKV / Scissorhands / FastGen</b> · <span>2023–2024</span></div></div>
+`});
+
+PAGES.push({type:'chapter',n:'04',rh:['第四章','分页管理显存'],
+  title:'分页管理显存',sub:'PagedAttention —— 借虚拟内存之智,灭碎片之患',fig:'paged',
+  quote:'缓存的麻烦,一半在它太大,一半在它太乱。',
+  body:`
+  <p class="drop">至此,我们转入"把缓存管好"之途。本途不削缓存中分毫数据,而专攻其安放、复用与迁移。开篇即是奠基之作——PagedAttention(vLLM,2023)。它不减一字节缓存,却将显存利用率由传统之二三成,提至近乎满载,从而在同一张卡上服务数倍的并发。</p>
+  <h3>连续分配的两种碎片</h3>
+  <p>传统之法,按 <code>max_seq_len</code> 为每个请求预留一整块<b>连续</b>显存。祸患有二:</p>
+  <ul><li><b>内部碎片</b> — 实际生成长度远短于预留,中间一大段预留却终未用上。此为损耗之大宗。</li>
+  <li><b>外部碎片</b> — 各请求预留块大小参差,释放后留下难以再利用的空隙。</li></ul>
+  <h3>分页之机</h3>
+  <p>PagedAttention 将每个序列的 KV Cache 切作固定大小的<b>块(block)</b>,通常容 16 或 32 个 token。一张<b>块表</b>维护逻辑块至物理块的映射,与操作系统的页表如出一辙。</p>
+  <div class="theorem"><div class="tname">命题 4.1 — 内部碎片之界</div>
+  $$\\text{每序列内部碎片}\\;<\\;\\text{block\\_size}\\;\\text{个 token}$$
+  <div class="note">块愈小,碎片愈微,然块表愈大、kernel 寻址愈繁。16/32 乃实测之平衡。</div></div>
+  <ul><li>物理块<b>无须连续</b>,按需分配,内部碎片遂被限于一块之内。</li>
+  <li>注意力 kernel 须改写为能从<b>非连续</b>的物理块中聚集(gather)K、V——此即"Paged"之名所系,亦其工程之核。</li></ul>
+  <div class="aside insight"><span class="al">洞见 · 写时复制</span>beam search、并行采样等场景下,多个序列共享同一前缀。分页令它们<b>共享物理块</b>,仅当某序列将于分叉处写入时,方复制该块——与操作系统的 fork/copy-on-write 别无二致。此机制,正是下一章"前缀缓存"得以成立的底层基石。</div>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>显存利用率近乎满载;vLLM 原论文载,吞吐较当时之 HF / FasterTransformer 提升 <b>二至四倍</b>。对模型质量<b>毫无影响</b>,数学输出分毫不变。</div><div class="con"><h5>所偿者</h5>定制注意力 kernel 之繁复;块表间接寻址的微小开销;block_size 需调优。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>Efficient Memory Management for Large Language Model Serving with PagedAttention</b> · <span>Kwon et al., 2023(vLLM)</span></div></div>
+`});
+
+PAGES.push({type:'chapter',n:'05',rh:['第五章','跨请求复用'],
+  title:'跨请求复用',sub:'前缀缓存 —— 相同的开头,只算一次',fig:'prefix',
+  quote:'成千上万的请求共享同一段开头,何必each都重算一遍?',
+  body:`
+  <p class="drop">海量请求往往共享相同的开篇——同一段 system prompt、同一组 few-shot 示例、同一篇被反复叩问的文档。前缀缓存将这段公共前缀的 K、V 算定后存留,后继命中之请求径直复用,跳过对它的重复 prefill。这一节所省者,非显存,而是<b>计算</b>。</p>
+  <h3>何以前缀须"精确而对齐"</h3>
+  <p>K、V 是位置相关的——同一 token 处于不同位置,所算出的 K、V 不同。故复用之前提极苛:两请求须<b>自第零个 token 起,逐 token 完全相同</b>;但有一处相异,其后的 K、V 尽数失效。这是 token 级、前缀对齐的匹配,不可跳跃,不可自中段起。</p>
+  <h3>两种实现:哈希与基数树</h3>
+  <table class="booktable"><caption>表 5.1 — 前缀缓存的两种组织</caption>
+  <tr><th>方案</th><th>机制</th><th>共享粒度</th><th>代表</th></tr>
+  <tr><td>Hash 前缀</td><td>对固定前缀分块哈希,查表命中</td><td>块级,宜固定模板</td><td>vLLM APC</td></tr>
+  <tr><td>RadixAttention</td><td>以基数树组织全部请求前缀,自动共享最长公共路径</td><td>动态细粒度,宜对话树</td><td>SGLang</td></tr></table>
+  <p><b>RadixAttention</b>(SGLang)是更通达之方:将所有活跃序列的 token 路径组织为一棵<b>基数树</b>,新请求沿树匹配最长公共前缀,自动复用相应缓存块,并以 <b>LRU</b> 驱逐冷僻枝节。多轮对话、共享示例、树状采样等繁复的共享结构,皆被它从容收纳。</p>
+  <div class="aside insight"><span class="al">洞见 · 收益落于何处</span>前缀缓存优化的是 <b>prefill 计算</b>,直降 <b>TTFT(首 token 延迟)</b>。它<b>丝毫不触及 decode</b>——其后逐 token 之生成,该多慢仍多慢。故于"长前缀、短续写"之境(RAG、冗长 system prompt)收益至巨,于"短前缀、长生成"则几近无感。</div>
+  <p>它构筑于 PagedAttention 的块共享之上:命中之前缀,径直挂上既有物理块(以写时复制护持),无须重算,亦不重复占用显存。它还须与 <b>chunked prefill</b> 协同,免得冗长前缀的预填充阻塞他者之解码。</p>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>高重复前缀之境,TTFT 与 prefill 算力大减;多租户共享 system prompt 时收益尤著。</div><div class="con"><h5>所偿者</h5>收益全系于命中率,前缀纷杂则近乎无用;须维护匹配结构(树/哈希)与驱逐之策。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>SGLang: Efficient Execution of Structured LM Programs (RadixAttention)</b> · <span>Zheng et al., 2023</span></div></div>
+`});
+
+PAGES.push({type:'chapter',n:'06',rh:['第六章','卸载与集群调度'],
+  title:'卸载与集群调度',sub:'分级存储与 PD 分离 —— 以带宽换容量,以分工逐瓶颈',fig:'offload',
+  quote:'显存装不下,就让缓存在存储层级之间流动起来。',
+  body:`
+  <p class="drop">当 KV Cache 大至显存不能相容,与其有损地削减,不如将一时用不到者,迁往更广而更缓的存储——是为<b>以带宽换容量</b>。在集群之尺度上,更可将 prefill 与 decode 拆分,各就其最适之硬件。这一节登抵全文之顶:系统与集群层面的缓存治理。</p>
+  <h3>分级卸载:先把账算清</h3>
+  <p>GPU 与 CPU 之间经 PCIe 相通(PCIe 4.0 ×16 单向约 32 GB/s),而 GPU 显存带宽则在 TB/s 之列——<b>相差两个数量级</b>。故朴素的卸载极易令搬运沦为瓶颈。其是否划算,系于一条不等式:</p>
+  <div class="theorem"><div class="tname">命题 6.1 — 卸载划算之条件</div>
+  $$t_{\\text{compute}}(\\text{层})\\;\\gtrsim\\;t_{\\text{transfer}}(\\text{层 KV})=\\frac{\\text{该层 KV 字节}}{\\text{PCIe 带宽}}$$
+  <div class="note">唯当一层的计算耗时足以掩盖下一层 KV 的搬运耗时,异步预取方近乎"免费";否则延迟暴露,解码受拖。</div></div>
+  <p>工程之要,在 <b>逐层异步预取</b>:计算第 $i$ 层之际,以独立的 CUDA stream 将第 $i{+}1$ 层的 KV 自 CPU 预取回显存,使传输与计算<b>交叠</b>。FlexGen 更进一步,将权重、KV、激活的卸载,统筹为一个整体的调度优化问题。</p>
+  <h3>PD 分离:拆开相冲的两阶段</h3>
+  <p>prefill 乃<b>计算受限</b>(并行处理整段 prompt,饱食算力),decode 乃<b>访存受限</b>(逐 token 而行,渴求带宽)。二者混于一批,则相互掣肘——冗长的 prefill 阻塞他者之 decode,致延迟抖动。<b>PD 分离</b>(Prefill-Decode Disaggregation)将其部署于<b>不同的 GPU 池</b>:</p>
+  <ul><li>Prefill 池算定 prompt,将所生之 <b>KV Cache 传输</b>予 Decode 池,由其接掌生成。</li>
+  <li>传输须走高速互联(<b>NVLink / RDMA</b>),否则跨节点搬运 KV 又成新瓶颈。</li>
+  <li>两池各自独立伸缩、各用其宜的并行策略,分头榨干各自的瓶颈资源。</li></ul>
+  <div class="aside insight"><span class="al">洞见 · 以 KV 为中心的架构</span>前沿如 Mooncake(Kimi),将 KV Cache 抽象为一座<b>独立的分布式存储池</b>,跨请求、跨节点、跨时间而复用——本质上,是把"前缀缓存 + 卸载 + PD 分离"熔铸为一套以 KV 为中心的服务架构。此乃当下大规模推理系统演进之重心。</div>
+  <div class="tradeoff"><div class="pro"><h5>所得者</h5>突破单卡显存之限,支撑超长上下文与超大并发;PD 分离消弭阶段间的相互干扰,增益集群吞吐与延迟之稳。</div><div class="con"><h5>所偿者</h5>卸载受制于 PCIe 带宽,预取未掩则拖慢延迟;PD 分离引入跨节点传输与繁复调度,须高速互联为之撑持。</div></div>
+  <div class="papers"><div class="ph">这一节延伸阅读</div>
+  <div class="p"><b>FlexGen: High-Throughput Generative Inference of LLMs with a Single GPU</b> · <span>Sheng et al., 2023</span></div>
+  <div class="p"><b>Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving</b> · <span>Moonshot AI, 2024</span></div>
+  <div class="p"><b>DistServe / Splitwise — Prefill-Decode 分离</b> · <span>2024</span></div></div>
+`});
+
+
+PAGES.push({type:'chapter',n:'07',rh:['第七章','全景与系统架构'],
+  title:'全景与系统架构',sub:'把六章拼成一张图 —— 从演进谱系到生产系统的数据流',fig:null,
+  quote:'这些技术不是一份清单,而是一张彼此牵引的网。',
+  body:`
+  <p class="lede">前面几节逐一拆解了各项技术。这一节我们退后一步,把它们放回同一张图里:它们如何沿时间演进,如何在一次推理中各司其职,又如何在一个真实的推理系统中协同成一条以 KV 为中心的数据流。</p>
+  <h3>演进谱系</h3>
+  <p>结构层的技术沿一条清晰的时间线展开:自 2017 年的 MHA,到 2019 年极简的 MQA,再到 2023 年折中的 GQA、2024 年低秩的 MLA。它们是<b>同一维度上的迭代,四选其一</b>。而系统层的技术(量化、分页、前缀缓存、卸载)与这条结构线<b>正交</b>——它们叠加在任意结构之上,可以全部开启。</p>
+  <div class="plate">${MAPS.lineage}<div class="fcap"><b>图 7.1</b>技术演进谱系 ── 结构层四选一(实线改进),系统层可叠加(虚线正交)</div></div>
+  <h3>一次推理中的分工</h3>
+  <p>把镜头拉到单次请求的时间轴上,prefill 与 decode 两段泾渭分明:前者并行、算力受限,后者逐字、带宽受限。各项技术作用于不同的段落——这解释了为何缩缓存的技术主要在 decode 见效,而前缀缓存只省 prefill。</p>
+  <div class="plate">${MAPS.timeline}<div class="fcap"><b>图 7.2</b>推理时间线 ── 各技术作用于 prefill / decode / 全程</div></div>
+  <h3>系统架构:数据如何流动</h3>
+  <p>真实的推理引擎(vLLM、SGLang、TensorRT-LLM)把这些技术编织成一条流水线。请求经调度器作连续批处理与分块预填充,经前缀匹配复用已有缓存,核心则是那个以 PagedAttention 为底座的 <b>KV Cache 管理器</b>——它掌管块表映射、写时复制与跨请求共享,并在 GPU、CPU、磁盘的分级存储间迁移缓存块。大规模部署还可将 prefill 与 decode 拆作两个 GPU 池,以 NVLink/RDMA 传输 KV。</p>
+  <div class="plate">${MAPS.arch}<div class="fcap"><b>图 7.3</b>现代推理系统架构 ── KV Cache 管理器是整条数据流的中枢</div></div>
+  <div class="marginalia"><div class="mk">❡</div><div class="mtext">注意红色的关键路径:几乎所有系统层优化,最终都汇聚到那个 KV Cache 管理器。它是"把缓存管好"一途的物理化身。</div></div>
+  <h3>如何取舍:一张决策图</h3>
+  <p>面对具体场景,选择并不玄奥。先认清首要约束——是显存装不下、并发上不去、还是首字延迟高——再沿决策图择取对应技术。一条通则贯穿始终:<b>右途(系统)先全开,左途(结构)按训练条件择一,量化按精度预算叠加。</b></p>
+  <div class="plate">${MAPS.decision}<div class="fcap"><b>图 7.4</b>技术选择决策图 ── 由首要约束出发</div></div>
+  <div class="aside insight"><span class="al">小结</span>六类技术,两条正交之途,一个中枢(KV 管理器)。理解了这张全景,任何一项新技术——无论是更激进的压缩,还是更聪明的调度——都能被你迅速安放进这张图的某个位置。</div>
+`});
+
+PAGES.push({type:'html',rh:['结语','两途归一'],title:'结语',body:`
+  <div class="chap-no">结 语 · Coda</div>
+  <div class="chap-title">两途归一,与一个旧问</div>
+  <div class="chap-sub">KV Cache 究竟是不是模型结构的一部分?</div>
+  <p class="drop">讲到这里,可以收个尾了。所有技术,终归两途。<b>"做小"</b>一途(第一至三章)改的是缓存里"存多少",其中共享/压缩与少存,皆触动模型结构,须重训,且于质量有所取舍。<b>"管好"</b>一途(第四至六章)改的是缓存"怎么用",纯由推理引擎实现,不动模型权重分毫,数学输出全然不变。</p>
+  <div class="theorem"><div class="tname">命题 7.1 — 两途之正交</div>
+  <p style="margin:0;font-size:15px;color:var(--ink2)">设结构优化为 $\\mathcal{S}$,系统优化为 $\\mathcal{E}$,则二者可复合而互不相消:$\\text{显存收益}(\\mathcal{S}\\circ\\mathcal{E})\\approx\\text{收益}(\\mathcal{S})\\times\\text{利用率}(\\mathcal{E})$。</p>
+  <div class="note">故生产之系统(vLLM、SGLang、TensorRT-LLM),恒于左途择一结构,而右途能开者尽开之。</div></div>
+  <p>于是回到开头那个最朴素的问题:<b>KV Cache 是模型结构的一部分吗?</b></p>
+  <p>答曰:<b>否</b>。KV Cache 本身是<b>推理时的一种优化机制</b>,它不含任何可训练参数,也不改变模型的数学定义——有它无它,模型的输出完全相同(浮点误差不计),区别只在快慢。然而,那些<b>为缓存友好而生</b>的结构设计(GQA、MLA),确确实实改动了模型本身。量化则游移于两可之间。</p>
+  <div class="marginalia"><div class="mk">∎</div><div class="mtext">缓存非结构,然结构可为缓存而改。技术之演进,常在这"机制"与"结构"的往复借力之间。</div></div>
+  <p>这正是这篇文章想说的核心:KV Cache 是一道桥,一端系于模型的数学,一端系于系统的工程。读懂了它随哪些因子膨胀,也就读懂了这两端如何彼此牵引、共同塑造了今日大模型推理的全部形态。</p>
+  <p style="text-align:center;font-family:'Cormorant Garamond';font-style:italic;font-size:20px;color:var(--accent);margin-top:40px">— 全 文 终 —</p>
+  <div style="text-align:center;color:var(--gold);font-size:20px;letter-spacing:.5em;margin-top:18px">❦</div>
+`});
+
+
+
+
+
+/* ===== 博客渲染引擎:单页顺序渲染 + 侧栏目录 + 滚动高亮 ===== */
+const article=document.getElementById('article');
+const tocEl=document.getElementById('toc');
+const prog=document.getElementById('progress');
+
+function figCap(k){return {share:'由 MHA 至 MLA,需缓存的 K/V 组数递减',quant:'位宽愈低,单个数值占用愈少',evict:'保留开头 sink 锚点,方得流式稳定',paged:'连续预留之浪费,对分页之紧致',prefix:'多请求共享前缀,墨色部分只算一次',offload:'GPU→CPU→磁盘的分级存储与带宽落差',overview:'技术全景:一根、两途、六类',attribution:'显存公式归因 ── 每项技术攻击哪个因子',lineage:'技术演进谱系 ── 结构层四选一,系统层可叠加',timeline:'推理时间线 ── 各技术作用于 prefill / decode / 全程',arch:'现代推理系统架构 ── KV Cache 管理器是数据流中枢',decision:'技术选择决策图 ── 由首要约束出发'}[k]||'';}
+
+// 计算章节图编号
+function figNoFor(figkey){return ({share:'1',quant:'2',evict:'3',paged:'4',prefix:'5',offload:'6'}[figkey]||'')+'.1';}
+
+let html='';
+let secs=[];   // {id,label,num}
+let secCount=0;
+let figCount=0;
+
+PAGES.forEach((p,i)=>{
+  if(p.type==='cover'){
+    html+=`<header class="post-head">
+      <div class="tagline">LLM 推理 · 深度长文</div>
+      <h1 class="title">KV Cache 全解:原理、优化与系统</h1>
+      <div class="subtitle">从自注意力的冗余计算,到一道主宰推理成本的显存公式,再到以 KV 为中心的服务架构 —— 把这条主线讲透。</div>
+      <div class="byline">
+        <div class="avatar">BS</div>
+        <div class="who"><div class="author">Bowen Su</div><div class="sub">2025 · 约 25 分钟阅读</div></div>
+        <div class="read">原理 · 数学<br>工程 · 系统</div>
+      </div>
+    </header>`;
+  } else if(p.type==='toc'){
+    // 博客不需要独立目录页,跳过(用侧栏)
+  } else if(p.type==='chapter'){
+    secCount++;
+    const id='s'+secCount;
+    secs.push({id,label:p.title,num:p.n});
+    let inner=`<section class="sec" id="${id}">
+      <div class="eyebrow">SECTION ${p.n}</div>
+      <h2>${p.title}</h2>
+      <div class="dek">${p.sub}</div>
+      ${p.quote?`<div class="quote">${p.quote}</div>`:''}`;
+    if(p.fig){figCount++;inner+=`<div class="plate">${FIGS[p.fig]}<div class="fcap"><b>图 ${figNoFor(p.fig)}</b>${figCap(p.fig)}</div></div>`;}
+    inner+=p.body+`</section>`;
+    // 把 body 内引用 MAPS.x / FIGS.x 的占位渲染(第七章 body 用了 ${MAPS...},已在模板串里求值)
+    html+=inner;
+  } else if(p.type==='html'){
+    secCount++;
+    const id='s'+secCount;
+    const label=p.title==='绪论'?'引子:为何缓存':(p.title==='结语'?'结语:两途归一':p.title);
+    secs.push({id,label,num:p.title==='绪论'?'00':'fin'});
+    // 把书籍味的 chap-no/chap-title/chap-sub 类名转成博客 section
+    let b=p.body
+      .replace(/<div class="chap-no">[^<]*<\/div>/,'<div class="eyebrow">'+(p.title==='绪论'?'引子':'结语')+'</div>')
+      .replace(/<div class="chap-title">([^<]*)<\/div>/,'<h2>$1</h2>')
+      .replace(/<div class="chap-sub">([^<]*)<\/div>/,'<div class="dek">$1</div>');
+    html+=`<section class="sec" id="${id}">${b}</section>`;
+  }
+});
+
+// 结尾署名
+html+=`<div class="end"><div class="sig">—— <b>Bowen Su</b></div><div class="dot">· · ·</div></div>`;
+article.innerHTML=html;
+
+// 侧栏目录
+tocEl.innerHTML=secs.map(s=>`<a href="#${s.id}" data-id="${s.id}"><span class="n">${s.num}</span>${s.label}</a>`).join('');
+
+// 滚动:进度条 + 高亮
+const links=[...tocEl.querySelectorAll('a')];
+function onScroll(){
+  const h=document.documentElement;
+  const sc=h.scrollTop/(h.scrollHeight-h.clientHeight);
+  prog.style.width=(sc*100)+'%';
+  let cur=secs[0]?.id;
+  secs.forEach(s=>{const el=document.getElementById(s.id);if(el&&el.getBoundingClientRect().top<140)cur=s.id;});
+  links.forEach(a=>a.classList.toggle('active',a.dataset.id===cur));
+}
+window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+
+// KaTeX:就绪后渲染,失败兜底
+function tidy(s){return s.replace(/[_^]\{([^}]*)\}/g,'_$1').replace(/[_^]([A-Za-z0-9])/g,'_$1').replace(/\\,/g,' ').replace(/\\times/g,'×').replace(/\\approx/g,'≈').replace(/\\ll/g,'≪').replace(/\\gtrsim/g,'≳').replace(/\\[a-zA-Z]+/g,'').replace(/[{}]/g,'').trim();}
+function cleanMath(root){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null);const ns=[];let n;while(n=w.nextNode())ns.push(n);ns.forEach(t=>{if(t.nodeValue.indexOf('$')<0)return;t.nodeValue=t.nodeValue.replace(/\$\$([^$]*)\$\$/g,(_,x)=>tidy(x)).replace(/\$([^$]*)\$/g,(_,x)=>tidy(x));});}
+(function ready(tries){
+  if(window.renderMathInElement){try{renderMathInElement(article,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});}catch(e){}return;}
+  if(tries>50){cleanMath(article);return;}
+  setTimeout(()=>ready(tries+1),100);
+})(0);
+
+</script>
+
+
+</body></html>
