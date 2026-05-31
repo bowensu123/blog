@@ -137,6 +137,11 @@
       <h2 class="section">文章</h2>
       <ul class="post-list">
         <li>
+          <a class="title" href="./posts/vllm-continuous-batching/">vLLM Continuous Batching：调度器交互式模拟</a>
+          <div class="meta">2026-05-31 <span class="tag">LLM</span> <span class="tag">推理优化</span> <span class="tag">vLLM</span></div>
+          <p class="desc">忠实复现 vLLM 的迭代级调度：每个 step 在 token 预算、序列槽、分页 KV cache 三重约束下贪心装箱，含 recompute 抢占与分块预填充。可交互调参，把瓶颈切换、KV 抢占与队头阻塞跑出来。</p>
+        </li>
+        <li>
           <a class="title" href="./posts/kv-cache/">KV Cache 全解：原理、优化与系统</a>
           <div class="meta">2026-05-24 <span class="tag">LLM</span> <span class="tag">推理优化</span></div>
           <p class="desc">从 Transformer 自注意力出发，系统梳理 KV Cache 的工作原理、内存与延迟瓶颈，以及主流的优化方法与系统实现。</p>

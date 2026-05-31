@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vLLM Continuous Batching Scheduler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#111722; --panel2:#0d131c; --line:#223040;
+    --text:#cdd9e5; --dim:#69788a; --dimmer:#3d4b5a;
+    --tok:#f0b429; --seq:#36c5f0; --kv:#bc8cff;
+    --ok:#3fb950; --warn:#f85149;
+    --mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --r:8px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);-webkit-font-smoothing:antialiased}
+  body{padding:22px;line-height:1.45;
+    background-image:radial-gradient(circle at 12% -10%, rgba(54,197,240,.06), transparent 40%),
+                     radial-gradient(circle at 92% 0%, rgba(240,180,41,.06), transparent 35%),
+                     radial-gradient(circle at 50% 120%, rgba(188,140,255,.05), transparent 45%);}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:15px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin:0 0 2px}
+  .sub{color:var(--dim);font-size:11.5px;letter-spacing:.04em;margin-bottom:18px}
+  .sub b{color:var(--tok);font-weight:700} .sub i{color:var(--seq);font-style:normal;font-weight:700}
+  .sub u{color:var(--kv);text-decoration:none;font-weight:700}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
+  .panel-title{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 11px;display:flex;align-items:center;gap:8px}
+  .panel-title::before{content:"";width:6px;height:6px;background:var(--dimmer);transform:rotate(45deg)}
+
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:16px 26px;align-items:end}
+  .ctl label{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.03em;margin-bottom:5px}
+  .ctl .lbl{color:var(--dim)} .ctl .val{font-weight:800}
+  .ctl.tok .val{color:var(--tok)} .ctl.seq .val{color:var(--seq)} .ctl.kv .val{color:var(--kv)} .ctl.bs .val{color:var(--ok)}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:3px;background:var(--line);outline:none;margin:4px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--text);cursor:pointer;border:3px solid var(--bg);box-shadow:0 0 0 1px var(--line)}
+  .ctl.tok input::-webkit-slider-thumb{background:var(--tok)} .ctl.seq input::-webkit-slider-thumb{background:var(--seq)} .ctl.kv input::-webkit-slider-thumb{background:var(--kv)}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--text);cursor:pointer;border:2px solid var(--bg)}
+  select{font-family:var(--mono);font-size:11.5px;font-weight:700;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;cursor:pointer}
+
+  .btnrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+  button{font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.05em;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer;transition:.12s}
+  button:hover{border-color:var(--dim);background:#16202c}
+  button.primary{background:var(--seq);color:#04222e;border-color:var(--seq)}
+  button.primary:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);cursor:pointer;user-select:none;margin-left:auto}
+  .toggle input{accent-color:var(--tok);width:15px;height:15px}
+  .iterbadge{font-size:11px;color:var(--dim);letter-spacing:.06em} .iterbadge b{color:var(--text);font-size:14px;font-weight:800}
+
+  .barhead{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;margin-bottom:6px}
+  .barhead .k{letter-spacing:.06em}
+  .barhead.tok .k{color:var(--tok)} .barhead.seq .k{color:var(--seq)} .barhead.kv .k{color:var(--kv)}
+  .barhead .v{color:var(--dim)} .barhead .v b{color:var(--text);font-weight:800}
+  .track{height:30px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;display:flex;overflow:hidden;position:relative}
+  .track.tok{margin-bottom:16px} .track.kv{margin-bottom:6px}
+  .seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:#0a0e14;min-width:2px;transition:.2s;border-right:1px solid rgba(0,0,0,.35);overflow:hidden}
+  .seg.decode{background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.22) 3px,rgba(0,0,0,.22) 6px)}
+  .slots{display:flex;gap:4px;flex-wrap:wrap}
+  .slot{flex:1 1 0;min-width:26px;max-width:80px;height:30px;border-radius:5px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#0a0e14}
+  .slot.empty{background:var(--panel2);color:var(--dimmer)} .slot.empty::after{content:"·"}
+
+  .binding{margin-top:13px;font-size:11.5px;letter-spacing:.03em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .tag{font-size:10px;font-weight:800;letter-spacing:.07em;padding:4px 9px;border-radius:5px;text-transform:uppercase}
+  .tag.tok{background:rgba(240,180,41,.16);color:var(--tok);border:1px solid rgba(240,180,41,.4)}
+  .tag.seq{background:rgba(54,197,240,.16);color:var(--seq);border:1px solid rgba(54,197,240,.4)}
+  .tag.kv{background:rgba(188,140,255,.16);color:var(--kv);border:1px solid rgba(188,140,255,.4)}
+  .tag.none{background:rgba(63,185,80,.13);color:var(--ok);border:1px solid rgba(63,185,80,.35)}
+  .tag.hol,.tag.pe{background:rgba(248,81,73,.14);color:var(--warn);border:1px solid rgba(248,81,73,.4)}
+  .binding .why{color:var(--dim)}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .qlist{display:flex;flex-direction:column;gap:6px;min-height:30px}
+  .chip{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:11px}
+  .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .chip .id{font-weight:800;width:30px}
+  .chip .meta{color:var(--dim);font-size:10px;flex:1}
+  .chip .pbar{height:5px;border-radius:3px;background:var(--line);flex:1.4;overflow:hidden;position:relative}
+  .chip .pbar > i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+  .chip.future{opacity:.4}
+  .chip .badge{font-size:8.5px;font-weight:800;letter-spacing:.04em;padding:2px 5px;border-radius:4px;text-transform:uppercase}
+  .b-pf{background:rgba(240,180,41,.16);color:var(--tok)} .b-de{background:rgba(54,197,240,.16);color:var(--seq)}
+  .b-pe{background:rgba(248,81,73,.16);color:var(--warn)} .b-ab{background:rgba(248,81,73,.22);color:var(--warn)}
+  .empty-note{color:var(--dimmer);font-size:11px;font-style:italic;padding:4px 2px}
+
+  .stats{display:flex;gap:20px;font-size:11px;color:var(--dim);flex-wrap:wrap} .stats b{color:var(--text);font-weight:800}
+  .stats .pe b{color:var(--warn)}
+
+  .log{font-size:10.5px;line-height:1.7;max-height:160px;overflow:auto;color:var(--dim)} .log div{white-space:pre-wrap}
+  .log .it{color:var(--text);font-weight:800} .log .am{color:var(--tok)} .log .cy{color:var(--seq)} .log .pu{color:var(--kv)} .log .wn{color:var(--warn)}
+  .log::-webkit-scrollbar{width:8px} .log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+  .legend{display:flex;gap:16px;font-size:10px;color:var(--dim);margin-top:10px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:6px} .legend .sw{width:16px;height:11px;border-radius:3px}
+  .legend .sw.de{background-image:repeating-linear-gradient(45deg,#3a4654,#3a4654 3px,#222d3a 3px,#222d3a 6px);background-color:#3a4654}
+  .legend .sw.pf{background:#3a4654}
+
+  details.doc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+  details.doc>summary{list-style:none;cursor:pointer;padding:13px 16px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--text);display:flex;align-items:center;gap:9px;user-select:none}
+  details.doc>summary::-webkit-details-marker{display:none}
+  details.doc>summary::before{content:"▸";color:var(--seq);font-size:11px;transition:.15s}
+  details.doc[open]>summary::before{transform:rotate(90deg)}
+  details.doc>summary:hover{background:#16202c}
+  .doc-body{padding:2px 18px 18px;font-size:12px;line-height:1.65;color:var(--text);border-top:1px solid var(--line)}
+  .doc-body p{margin:11px 0;color:#b6c4d2} .doc-body b{color:var(--text)}
+  .doc-body h4{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:16px 0 7px}
+  .doc-body code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+  .doc-body .am{color:var(--tok);font-weight:700} .doc-body .cy{color:var(--seq);font-weight:700} .doc-body .pu{color:var(--kv);font-weight:700} .doc-body .warn{color:var(--warn);font-weight:700}
+  .doc-body ul{margin:8px 0;padding-left:18px;color:#b6c4d2} .doc-body li{margin:5px 0}
+  table.cost{width:100%;border-collapse:collapse;margin:12px 0;font-size:11px}
+  table.cost th,table.cost td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+  table.cost th{background:var(--panel2);color:var(--dim);font-weight:700;letter-spacing:.05em;font-size:10px;text-transform:uppercase}
+  pre.code{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:13px 15px;font-size:11px;line-height:1.62;overflow-x:auto;color:#b6c4d2;margin:10px 0}
+  pre.code .kw{color:#ff7b72} pre.code .cm{color:var(--dimmer);font-style:italic} pre.code .am{color:var(--tok)} pre.code .cy{color:var(--seq)} pre.code .pu{color:var(--kv)} pre.code .fn{color:#d2a8ff}
+  .exp{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:6px}
+  .exp .card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:11px 13px}
+  .exp .card h5{margin:0 0 6px;font-size:11px;letter-spacing:.04em;color:var(--text)}
+  .exp .card p{margin:0;font-size:11px;line-height:1.55;color:#9fb0c0}
+  .exp .card .how{display:block;margin-top:7px;font-size:10px;color:var(--dim)} .exp .card .how b{color:var(--seq)}
+  @media(max-width:680px){.exp{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
+  .doc-body .mathblock{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 16px;margin:12px 0;overflow-x:auto}
+  .doc-body mjx-container{color:var(--text)}
+  .doc-body mjx-container[display="true"]{margin:.6em 0}
+  table.cost td mjx-container{margin:0}
+  .exp-legend{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:14px}
+  .exp-legend .elt{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+  .exp-legend .row{font-size:11.5px;line-height:1.55;margin:7px 0;color:#9fb0c0}
+  .exp-legend .pname{font-weight:800}
+  .exp-legend .pname.ok{color:var(--ok)}
+  .exp-legend .note{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);color:var(--dim);font-size:10.5px;line-height:1.6}
+</style>
+<script>
+window.MathJax = {
+  loader: {load: ['[tex]/color']},
+  tex: {
+    packages: {'[+]': ['color']},
+    inlineMath: [['\\(','\\)']],
+    displayMath: [['\\[','\\]']],
+    macros: {
+      ct: ['\\color{##f0b429}{#1}', 1],
+      cs: ['\\color{##36c5f0}{#1}', 1],
+      ck: ['\\color{##bc8cff}{#1}', 1]
+    }
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>vLLM · Continuous Batching Scheduler</h1>
+  <div class="sub">忠实复现:每个 step 在三重物理约束下构建批次 — <b>max_num_batched_tokens</b>(计算量)、<i>max_num_seqs</i>(序列槽)、<u>分页 KV cache 块</u>(显存)。含 recompute 抢占与分块预填充同 step 产首 token。</div>
+
+  <!-- PRINCIPLES -->
+  <details class="doc" open>
+    <summary>原理 · 这个调度器在做什么</summary>
+    <div class="doc-body">
+      <h4>1 · 迭代级调度(为什么叫"持续"批处理)</h4>
+      <p>早期的<b>静态批处理</b>(static batching)把一批请求绑成一个固定 batch,整批必须等其中<b>最长</b>的那条序列生成完才统一释放。由于不同请求的生成长度差异极大,先完成的序列只能空占算力与显存干等,GPU 利用率被长尾拖垮。设批内第 <code>i</code> 条序列实际生成 \(\ell_i\) 个 token、批大小为 \(M\),则静态批处理对算力的有效利用率为</p>
+      <div class="mathblock">\[ \eta \;=\; \frac{\sum_{i=1}^{M}\ell_i}{M \,\cdot\, \max_{i}\,\ell_i}\,. \]</div>
+      <p>长度方差越大,分母里的 \(\max_i \ell_i\) 被个别长序列拉高,\(\eta\) 越接近 \(0\)——这正是静态批处理的痛点。</p>
+      <p>vLLM 改用 <b>iteration-level scheduling(迭代级调度)</b>:模型每跑完<b>一次前向</b>(一个 step / iteration),调度器就<b>重新构建一次批次</b>。关键观察是——自回归解码每个 step 对每条运行序列只产出 \(1\) 个 token,因此<b>批次成员可以逐 step 自由进出而不付出额外代价</b>:完成的序列立刻离场、归还它占用的 KV cache 块与序列槽,等待队列里的新请求立刻补位。成员持续流动,故称 <b>continuous batching</b>。</p>
+
+      <h4>2 · 请求的两个相位与各自的瓶颈</h4>
+      <ul>
+        <li><b class="am">Prefill(预填充)</b>:把整段 prompt 一次性<b>并行</b>喂入,一个 step 算出 prompt 全部 token 的 KV。长度 \(L\) 的 prompt 在该 step 贡献 \(L\) 个 token 的计算量,却只占 <b>1 个序列槽</b>。由于同一份模型权重被 \(L\) 个 token 复用,算术强度(arithmetic intensity)高 → 通常 <b class="am">compute-bound(算力受限)</b>。</li>
+        <li><b class="cy">Decode(解码)</b>:自回归逐 token 生成,每个运行序列每 step 产 <b>1 个 token</b>、占 <b>1 个序列槽</b>。单 token 却要把整份权重与该序列的 KV cache 从显存读一遍,算术强度低 → <b class="cy">memory-bandwidth-bound(显存带宽受限)</b>。这也解释了为何 batch 对 decode 收益巨大:多条序列<b>摊薄</b>了同一次权重读取。</li>
+      </ul>
+
+      <h4>3 · 三重约束(调度的核心)</h4>
+      <p>构建一个 step 的批次,本质是在<b>三个相互独立的预算</b>下做贪心装箱(greedy bin-packing)。设本 step 批内条目 \(i\) 消耗 \(t_i\) 个 token、其上下文长度为 \(\mathrm{ctx}_i\),块大小为 \(B\),则<b>必须同时满足</b>:</p>
+      <div class="mathblock">\[
+        \begin{aligned}
+        \sum_i t_i &\;\le\; \ct{T_{\max}} && \text{单步计算量上限}\\[5pt]
+        N \;(\text{批内序列条数}) &\;\le\; \cs{N_{\max}} && \text{batch 维度上限}\\[5pt]
+        \sum_i \left\lceil \frac{\mathrm{ctx}_i}{B} \right\rceil &\;\le\; \ck{K} && \text{分页 KV 显存上限}
+        \end{aligned}
+      \]</div>
+      <p>三个上限分别对应控制面板的参数:\(\ct{T_{\max}}=\)<code>max_num_batched_tokens</code>、\(\cs{N_{\max}}=\)<code>max_num_seqs</code>、\(\ck{K}=\)<code>num_gpu_blocks</code>、\(B=\)<code>block_size</code>。每个条目在三个预算里的"成本"取决于它处于哪个相位:</p>
+      <table class="cost">
+        <tr><th>相位</th><th>token 成本 \(t_i\)</th><th>序列槽</th><th>KV 块占用</th><th>主要受限于</th></tr>
+        <tr><td class="am">prefill</td><td><b>prompt 长度 \(L\)</b></td><td>\(1\)</td><td>\(\lceil L/B\rceil\)(随 \(L\) 增长)</td><td class="am"><b>tokens</b> / <span class="pu">KV</span></td></tr>
+        <tr><td class="cy">decode</td><td><b>\(1\)</b></td><td>\(1\)</td><td>每 \(B\) 个 token \(+1\) 块</td><td class="cy"><b>seqs</b> / <span class="pu">KV</span></td></tr>
+      </table>
+      <p>三个预算里<b>任意一个先归零</b>就成为本 step 的瓶颈,且瓶颈会随相位切换:大量 prompt 涌入做 prefill 时 token 预算先耗尽 → <span class="am">token-bound</span>;进入稳态 decode 后序列槽占满 → <span class="cy">seq-bound</span>;上下文累积、显存吃紧时 KV 块先用光 → <span class="pu">KV-bound</span>。</p>
+
+      <h4>4 · 分页 KV cache 与抢占(PagedAttention)</h4>
+      <p>KV cache 被切成固定大小的<b>块(block)</b>,每块存 \(B\)(<code>block_size</code>)个 token 的 KV。承载 \(n\) 个 token 的上下文需要</p>
+      <div class="mathblock">\[ \left\lceil \frac{n}{B} \right\rceil \text{ 个块},\qquad \text{末块平均浪费 } \frac{B-1}{2} \text{ 个槽位(内部碎片)。} \]</div>
+      <p>块总数 \(\ck{K}\)(<code>num_gpu_blocks</code>)由显存容量决定,是一条<b>硬上限</b>。Decode 时,<b>当且仅当</b>上下文长度恰好<b>跨过块边界</b>才需要新分配 \(1\) 块:</p>
+      <div class="mathblock">\[ \left\lceil \tfrac{n+1}{B} \right\rceil > \left\lceil \tfrac{n}{B} \right\rceil \quad\iff\quad n \equiv 0 \pmod{B}. \]</div>
+      <p>当某个运行序列要追加 token 却<b class="warn">无空闲块</b>时,调度器触发<b class="warn">抢占(preemption)</b>:按 FCFS 优先级,从运行集里挑<b>优先级最低(最晚到达)</b>的序列开刀。默认的 <b>recompute</b> 模式会——释放被抢占者的<b>全部</b> KV 块、把它退回等待队列<b>队头</b>;待重新调度时,必须对 \(\text{prompt} + \text{已生成 token}\) <b>整段重新 prefill</b>。也就是说,一个 prompt 长 \(L\)、已生成 \(g\) 个 token 的序列被抢占后,其 re-prefill 目标长度变为</p>
+      <div class="mathblock">\[ L_{\text{re}} \;=\; L + g \;\ge\; L, \]</div>
+      <p>这部分计算被白白重做,正是抢占的代价(因此本模拟器对被抢占序列的 re-prefill 目标会变长)。</p>
+      <p><b>关键:chunked prefill 不降低 KV 占用。</b>它只把 prefill 的<i style="color:#b6c4d2">计算</i>分摊到多个 step,削平算力尖峰;但整段 prompt 的 KV 最终都要常驻显存。因此只要一个请求满足</p>
+      <div class="mathblock">\[ \left\lceil \frac{L}{B} \right\rceil \;>\; \ck{K}, \]</div>
+      <p>它<b class="warn">永远装不下</b> → vLLM 在准入时直接拒绝(本模拟器标为 <span class="warn">aborted</span>),且<b>不会阻塞</b>排在它后面的请求。</p>
+
+      <h4>5 · Chunked prefill 与队头阻塞(HOL blocking)</h4>
+      <p>关闭 chunked prefill 时,prefill 必须<b>整段一次</b>完成。若队头请求满足 \(L > \ct{T_{\max}}\),它单步塞不下又不可分割,在 FIFO 下会<b class="warn">堵死整条队列</b>(head-of-line block),后面再小的请求也只能干等。</p>
+      <p>开启 chunked prefill 后,长 prompt 被切成不超过 token 预算的多个 chunk。在不与 decode 混批的极端情形下,单独 prefill 它大致需要</p>
+      <div class="mathblock">\[ \left\lceil \frac{L}{\ct{T_{\max}}} \right\rceil \text{ 个 step}, \]</div>
+      <p>这些 chunk 跨 step 灌入,并可与其它序列的 decode <b>混批</b>填满预算;<b>且在最后一个 chunk 完成 prefill 的同一个 step 就采样出首 token</b>(本模拟器复现了这一点)。这样既消除了 HOL 阻塞,又把 prefill 的算力尖峰摊平到多个 step 上。</p>
+    </div>
+  </details>
+
+  <!-- CONTROLS -->
+  <div class="panel">
+    <div class="controls">
+      <div class="ctl tok"><label><span class="lbl">max_num_batched_tokens</span><span class="val" id="vTok">512</span></label><input type="range" id="sTok" min="64" max="2048" step="64" value="512"></div>
+      <div class="ctl seq"><label><span class="lbl">max_num_seqs</span><span class="val" id="vSeq">6</span></label><input type="range" id="sSeq" min="1" max="16" step="1" value="6"></div>
+      <div class="ctl kv"><label><span class="lbl">num_gpu_blocks (KV)</span><span class="val" id="vKv">64</span></label><input type="range" id="sKv" min="24" max="256" step="8" value="64"></div>
+      <div class="ctl bs"><label><span class="lbl">block_size B</span><span class="val" id="vBs">16</span></label>
+        <select id="sBs"><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></div>
+    </div>
+    <div class="btnrow">
+      <button class="primary" id="bStep">▸ Step</button>
+      <button id="bPlay">⏵ Play</button>
+      <button id="bReset">↺ Reset</button>
+      <span class="iterbadge">iteration&nbsp; <b id="iterN">0</b></span>
+      <label class="toggle"><input type="checkbox" id="cChunk" checked> chunked prefill</label>
+    </div>
+  </div>
+
+  <!-- BATCH VIZ -->
+  <div class="panel">
+    <div class="panel-title">本 step 构建的批次 · the batch this iteration</div>
+    <div class="barhead tok"><span class="k">TOKEN BUDGET</span><span class="v"><b id="tokUsed">0</b> / <span id="tokMax">512</span> tokens</span></div>
+    <div class="track tok" id="tokTrack"></div>
+    <div class="barhead seq"><span class="k">SEQUENCE SLOTS</span><span class="v"><b id="seqUsed">0</b> / <span id="seqMax">6</span> sequences</span></div>
+    <div class="slots" id="seqSlots"></div>
+    <div class="binding" id="binding"></div>
+    <div class="legend">
+      <span><i class="sw pf"></i> prefill (吃 L 个 token)</span>
+      <span><i class="sw de"></i> decode (每序列 1 token)</span>
+    </div>
+  </div>
+
+  <!-- KV CACHE -->
+  <div class="panel">
+    <div class="panel-title">分页 KV cache · resident blocks (PagedAttention)</div>
+    <div class="barhead kv"><span class="k">KV BLOCKS</span><span class="v"><b id="kvUsed">0</b> / <span id="kvMax">64</span> blocks &nbsp;·&nbsp; free <b id="kvFree">64</b></span></div>
+    <div class="track kv" id="kvTrack"></div>
+    <div class="legend"><span>每段宽度 = 该序列常驻的 KV 块数 ⌈ctx/B⌉;耗尽时触发 recompute 抢占。</span></div>
+  </div>
+
+  <!-- QUEUES -->
+  <div class="cols">
+    <div class="panel"><div class="panel-title">Waiting / Prefilling queue</div><div class="qlist" id="qWait"></div></div>
+    <div class="panel"><div class="panel-title">Running (decoding)</div><div class="qlist" id="qRun"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Throughput</div>
+    <div class="stats">
+      <span>finished&nbsp; <b id="stFin">0</b> / <span id="stTot">0</span></span>
+      <span>tokens generated&nbsp; <b id="stGen">0</b></span>
+      <span>queued&nbsp; <b id="stQ">0</b></span>
+      <span class="pe">preemptions&nbsp; <b id="stPe">0</b></span>
+      <span>aborted&nbsp; <b id="stAb">0</b></span>
+    </div>
+  </div>
+
+  <div class="panel"><div class="panel-title">Scheduler log</div><div class="log" id="log"></div></div>
+
+  <!-- PSEUDOCODE -->
+  <details class="doc">
+    <summary>调度循环 · 每个 step 的伪代码(含抢占)</summary>
+    <div class="doc-body">
+      <p>下面就是本模拟器每个 step 实际执行的逻辑,对应 vLLM 统一(chunked-prefill)调度路径。三处与真实行为一致:<b>running 优先</b>、<b>KV 块不足时按 FCFS 从尾部抢占(recompute)</b>、<b>prefill 完成同 step 采样首 token</b>。</p>
+      <pre class="code"><span class="kw">def</span> <span class="fn">schedule_step</span>(running, waiting):
+    bt = <span class="am">max_num_batched_tokens</span>;  bs = <span class="cy">max_num_seqs</span>;  batch = []
+    free = <span class="pu">num_gpu_blocks</span> - Σ ⌈ctx(r)/B⌉  for r in resident
+
+    <span class="cm"># ── 1. running-status(decode 与在飞的 chunked-prefill),优先级 = FCFS ──</span>
+    dq = sort(running ∪ prefilling, by=arrival)        <span class="cm"># 队头=最高优先级</span>
+    <span class="kw">while</span> dq:
+        seq = dq[0];  t = 1 <span class="kw">if</span> decode <span class="kw">else</span> min(remaining, bt)
+        <span class="kw">if</span> bs &lt; 1 <span class="kw">or</span> bt &lt; 1:  <span class="kw">break</span>            <span class="cm"># seq/token-bound</span>
+        need = ⌈(ctx+t)/B⌉ - ⌈ctx/B⌉                  <span class="cm"># 跨块才需新块</span>
+        <span class="kw">while</span> need &gt; free:                         <span class="cm"># ── 抢占 ──</span>
+            <span class="kw">if</span> len(dq) &gt; 1:  <span class="pu">preempt_recompute</span>(dq.pop())  <span class="cm"># 牺牲最低优先级</span>
+            <span class="kw">else</span>:            <span class="pu">preempt_recompute</span>(seq); <span class="kw">break</span>     <span class="cm"># 连自己也保不住</span>
+            free = recompute_free()
+        schedule(seq, t);  bt -= t;  bs -= 1;  dq.popleft()
+        <span class="kw">if</span> prefill_just_completed(seq):
+            <span class="pu">sample_first_token</span>(seq)               <span class="cm"># 同 step 产首 token</span>
+
+    <span class="cm"># ── 2. waiting(新 prefill),FIFO ──</span>
+    <span class="kw">for</span> seq <span class="kw">in</span> sort(waiting, by=arrival):
+        <span class="kw">if</span> bs &lt; 1:  <span class="kw">break</span>
+        target = seq.prompt + seq.generated           <span class="cm"># 被抢占者含已生成 token</span>
+        <span class="kw">if</span> ⌈target/B⌉ &gt; <span class="pu">num_gpu_blocks</span>:  <span class="wn">abort</span>(seq); <span class="kw">continue</span>  <span class="cm"># 永远装不下</span>
+        chunk = min(target - seq.prefilled, bt) <span class="kw">if</span> chunked <span class="kw">else</span> full
+        <span class="kw">if</span> chunk &gt; bt:  <span class="kw">break</span>                     <span class="cm"># token-bound / HOL</span>
+        <span class="kw">if</span> blocks(chunk) &gt; free:  <span class="kw">break</span>            <span class="cm"># KV-bound(等释放)</span>
+        admit(seq, chunk);  bt -= chunk;  bs -= 1
+        <span class="kw">if</span> prefill_just_completed(seq):  <span class="pu">sample_first_token</span>(seq)
+    <span class="kw">return</span> batch</pre>
+    </div>
+  </details>
+
+  <!-- EXPERIMENTS -->
+  <details class="doc">
+    <summary>动手实验 · 把原理跑出来</summary>
+    <div class="doc-body">
+      <div class="exp-legend">
+        <div class="elt">四个可调参数 · what each knob means</div>
+        <div class="row"><span class="pname am">max_num_batched_tokens</span> — 单步 <b>token 预算</b>(计算量上限)。本 step 批内所有条目消耗的 token 之和不得超过它;prefill 一次吃 \(L\) 个 token,所以它主要压制 prefill 的算力尖峰。</div>
+        <div class="row"><span class="pname cy">max_num_seqs</span> — <b>序列槽数</b>(batch 宽度上限)。一个 step 最多并行多少条序列(prefill 或 decode 各占 1 槽)。这是 decode 稳态最常见的瓶颈。</div>
+        <div class="row"><span class="pname pu">num_gpu_blocks</span> — 分页 KV cache 的<b>物理块总数</b>(显存硬上限)。所有常驻序列占用的块数 \(\sum_i \lceil \mathrm{ctx}_i/B\rceil\) 不得超过它;耗尽时触发 recompute 抢占。</div>
+        <div class="row"><span class="pname ok">block_size B</span> — 每个 KV 块容纳的 <b>token 数</b>。越小内部碎片越少,但 decode 跨块边界更频繁、所需块数更多。</div>
+        <div class="note">实验卡片里的 “设置 <b>512 / 6 / 64 / B16</b>” 按顺序表示 <span class="am">max_num_batched_tokens</span> / <span class="cy">max_num_seqs</span> / <span class="pu">num_gpu_blocks</span> / <span style="color:var(--ok);font-weight:700">block_size</span> = 512 / 6 / 64 / 16。改某一项时,其余保持此默认值。</div>
+      </div>
+      <div class="exp">
+        <div class="card"><h5>① 瓶颈随相位切换</h5><p>默认参数 Play。开局长 prompt 撑爆琥珀条 → <span class="am">token-bound</span>;进入稳态 decode 后槽位占满 → <span class="cy">seq-bound</span>。</p><span class="how">设置:<b>512 / 6 / 64 / B16</b></span></div>
+        <div class="card"><h5>② 触发 KV 抢占(recompute)</h5><p>把 num_gpu_blocks 调到 <b>40</b>。KV 块很快不够,运行序列被退回队头重算,log 出现紫色 <span class="pu">preempt</span>,被抢占请求的 re-prefill 目标变长。</p><span class="how">设置:<b>num_gpu_blocks = 40</b></span></div>
+        <div class="card"><h5>③ KV 太小 → 请求被拒</h5><p>调到 <b>32</b>。prompt 长的请求(如 R6=800)需 ⌈800/16⌉=50 块 &gt; 32,永远装不下 → 直接 <span class="warn">aborted</span>,但不阻塞后面的请求。</p><span class="how">设置:<b>num_gpu_blocks = 32</b></span></div>
+        <div class="card"><h5>④ 队头阻塞 vs 分块</h5><p>关 chunked prefill 再 Reset。L &gt; token 预算的请求整段塞不下,FIFO 队头卡死(<span class="warn">HOL</span>)。重新勾上即分块流动,且完成 prefill 同 step 产首 token。</p><span class="how">设置:<b>chunked 关 → 开</b></span></div>
+        <div class="card"><h5>⑤ 掐死序列并行</h5><p>max_num_seqs = <b>2</b>。decode 阶段常驻 <span class="cy">seq-bound</span>,token 与 KV 预算大量闲置。</p><span class="how">设置:<b>max_num_seqs = 2</b></span></div>
+        <div class="card"><h5>⑥ 块大小的影响</h5><p>把 B 从 16 改成 <b>8</b>。块更细 → 内部碎片更少但块数需求更多;decode 更频繁跨边界,抢占更易触发。</p><span class="how">设置:<b>block_size = 8</b></span></div>
+      </div>
+      <p style="margin-top:14px"><b>配平直觉:</b> <span class="am">tokens</span> 控单步算力/prefill 尖峰;<span class="cy">seqs</span> 控批宽;<span class="pu">KV 块</span> 控可同时驻留的总上下文。三者任一先归零即成瓶颈,按你的 <code>prompt:生成</code> 长度比与显存来权衡。</p>
+      <p style="font-size:10px;color:var(--dimmer)">已建模:迭代级调度、三重约束装箱、分页 KV、recompute 抢占(FCFS 选victim、回插队头、re-prefill 含已生成 token)、准入拒绝、chunked prefill 同 step 首 token。未建模(真实系统的其它可选机制):SWAP 抢占模式、prefix/前缀缓存复用、beam search、推测解码、跨请求 block 共享、watermark 在小规模下近似为 0。</p>
+    </div>
+  </details>
+</div>
+
+<script>
+// workload: [id, arrival, promptLen, genLen]
+const WORKLOAD=[[1,0,40,8],[2,0,350,10],[3,0,120,6],[4,0,600,12],[5,0,60,14],
+  [6,2,800,8],[7,2,200,10],[8,4,90,16],[9,4,450,7],[10,6,150,12],[11,6,700,9],[12,8,300,11]];
+const hue=id=>(id*47)%360, col=id=>`hsl(${hue(id)} 62% 60%)`;
+
+let P={tok:512,seq:6,blocks:64,B:16,chunked:true};
+let iter=0,reqs=[],last=null,playing=false,timer=null;
+
+const prio=(a,b)=> a.arrival-b.arrival || a.id-b.id;
+const ctxLen=r=> r.state==='running'?(r.prompt+r.generated): r.state==='prefilling'?r.prefilled:0;
+const blocksOf=r=> Math.ceil(ctxLen(r)/P.B);
+const usedBlocks=()=> reqs.reduce((s,r)=>s+blocksOf(r),0);
+const freeBlocks=()=> P.blocks-usedBlocks();
+const resident=()=> reqs.filter(r=>r.state==='running'||r.state==='prefilling');
+function lowestPriorityResident(except){
+  const r=resident().filter(x=>x!==except).sort(prio); return r.length?r[r.length-1]:null;
+}
+function preemptRecompute(v,ev){
+  v.state='waiting'; v.prefilled=0; v.preemptions=(v.preemptions||0)+1;
+  ev.push({t:'pe',id:v.id});
+}
+function completePrefill(seq,ev){
+  // prefill reached target this step -> sample first/next token in SAME step
+  seq.state='running';
+  const L=seq.prompt+seq.generated;
+  const need=Math.ceil((L+1)/P.B)-Math.ceil(L/P.B);
+  if(need<=freeBlocks()){
+    seq.generated+=1; if(seq.generated>=seq.gen) seq.state='finished';
+  }else{
+    const v=lowestPriorityResident(seq);
+    if(v){ preemptRecompute(v,ev); seq.generated+=1; if(seq.generated>=seq.gen) seq.state='finished'; }
+    // else: KV pressure, defer first token to next step (stays running)
+  }
+}
+
+function reset(){
+  iter=0; last=null; playing=false; stopTimer();
+  reqs=WORKLOAD.map(([id,arrival,prompt,gen])=>({id,arrival,prompt,gen,prefilled:0,generated:0,state:'waiting',preemptions:0,aborted:false}));
+  document.getElementById('log').innerHTML=''; document.getElementById('bPlay').textContent='⏵ Play';
+  render();
+}
+function stopTimer(){ if(timer){clearInterval(timer);timer=null;} }
+
+function step(){
+  if(reqs.every(r=>r.state==='finished')){ stopTimer();playing=false;document.getElementById('bPlay').textContent='⏵ Play';return; }
+  iter++;
+  let bt=P.tok, bs=P.seq;
+  const batch=[], ev=[]; let binding=null, hol=null;
+  const watermark=Math.floor(0.01*P.blocks);
+
+  // PHASE 1: running-status (decode + in-flight prefill) with preemption
+  const dq=resident().sort(prio);
+  while(dq.length){
+    const seq=dq[0];
+    const isRun=seq.state==='running';
+    let t;
+    if(isRun){ t=1; }
+    else { const rem=(seq.prompt+seq.generated)-seq.prefilled; t=P.chunked?Math.min(rem,bt):rem; }
+    if(bs<1){ binding=binding||'seq'; break; }
+    if(isRun){ if(bt<1){ binding=binding||'tok'; break; } }
+    else { if(t<=0){ binding=binding||'tok'; break; } }
+    // KV blocks needed
+    let extra;
+    if(isRun){ const L=seq.prompt+seq.generated; extra=Math.ceil((L+1)/P.B)-Math.ceil(L/P.B); }
+    else { extra=Math.ceil((seq.prefilled+t)/P.B)-Math.ceil(seq.prefilled/P.B); }
+    let selfPreempted=false;
+    while(extra>freeBlocks()){
+      if(dq.length>1){ preemptRecompute(dq.pop(),ev); }
+      else { preemptRecompute(seq,ev); dq.shift(); selfPreempted=true; break; }
+    }
+    if(selfPreempted) continue;
+    // schedule
+    bs-=1;
+    if(isRun){
+      bt-=1; seq.generated+=1; batch.push({r:seq,type:'decode',tokens:1});
+      if(seq.generated>=seq.gen) seq.state='finished';
+    } else {
+      bt-=t; seq.prefilled+=t; batch.push({r:seq,type:'prefill',tokens:t});
+      if(seq.prefilled>=(seq.prompt+seq.generated)) completePrefill(seq,ev);
+    }
+    dq.shift();
+  }
+
+  // PHASE 2: waiting -> new prefills (FIFO), with KV admission + abort
+  const wc=reqs.filter(r=>r.state==='waiting'&&r.arrival<=iter).sort(prio);
+  for(const seq of wc){
+    if(bs<1){ binding=binding||'seq'; break; }
+    const target=seq.prompt+seq.generated;
+    const fullNeed=Math.ceil(target/P.B);
+    if(fullNeed > P.blocks-watermark){ seq.state='finished'; seq.aborted=true; ev.push({t:'ab',id:seq.id,need:fullNeed}); continue; }
+    const rem=target-seq.prefilled;
+    if(!P.chunked && rem>P.tok){ binding=binding||'tok'; hol=seq.id; break; }
+    let chunk=P.chunked?Math.min(rem,bt):rem;
+    if(chunk<=0){ binding=binding||'tok'; break; }
+    if(chunk>bt){ binding=binding||'tok'; break; }
+    const extra=Math.ceil((seq.prefilled+chunk)/P.B)-Math.ceil(seq.prefilled/P.B);
+    if(extra > freeBlocks()-watermark){ binding=binding||'kv'; break; }
+    seq.state='prefilling'; seq.prefilled+=chunk; bt-=chunk; bs-=1;
+    batch.push({r:seq,type:'prefill',tokens:chunk});
+    if(seq.prefilled>=target) completePrefill(seq,ev);
+  }
+
+  const tokensUsed=batch.reduce((s,i)=>s+i.tokens,0), seqsUsed=batch.length;
+  const stillQ=reqs.some(r=>(r.state==='waiting'&&r.arrival<=iter)||r.state==='prefilling');
+  if(!binding) binding= (stillQ&&seqsUsed===P.seq)?'seq':'none';
+  const preempts=ev.filter(e=>e.t==='pe').length, aborts=ev.filter(e=>e.t==='ab');
+  last={iter,batch,tokensUsed,seqsUsed,binding,hol,preempts,aborts,bt:P.tok,bs:P.seq};
+  logStep(last,ev);
+  render();
+  if(reqs.every(r=>r.state==='finished')){ stopTimer();playing=false;document.getElementById('bPlay').textContent='⏵ Play'; }
+}
+
+function logStep(L,ev){
+  const pf=L.batch.filter(i=>i.type==='prefill').length, de=L.batch.filter(i=>i.type==='decode').length;
+  let b='→ fits';
+  if(L.binding==='tok') b=L.hol?`→ <span class="wn">HOL block R${L.hol}</span>`:`→ <span class="am">token-bound</span>`;
+  else if(L.binding==='seq') b='→ <span class="cy">seq-bound</span>';
+  else if(L.binding==='kv') b='→ <span class="pu">KV-bound</span>';
+  let extra='';
+  if(L.preempts) extra+=` <span class="pu">⟲${L.preempts} preempt</span>`;
+  L.aborts.forEach(a=> extra+=` <span class="wn">✗abort R${a.id}(需${a.need}块)</span>`);
+  const line=`<div><span class="it">step ${String(L.iter).padStart(2,' ')}</span>  pf:${pf} de:${de}  `+
+    `<span class="am">tok ${String(L.tokensUsed).padStart(4,' ')}/${L.bt}</span>  `+
+    `<span class="cy">seq ${L.seqsUsed}/${L.bs}</span>  `+
+    `<span class="pu">kv ${usedBlocks()}/${P.blocks}</span>  ${b}${extra}</div>`;
+  document.getElementById('log').insertAdjacentHTML('afterbegin',line);
+}
+
+function render(){
+  document.getElementById('iterN').textContent=iter;
+  document.getElementById('tokMax').textContent=P.tok;
+  document.getElementById('seqMax').textContent=P.seq;
+  document.getElementById('kvMax').textContent=P.blocks;
+  const batch=last?last.batch:[];
+
+  // token bar
+  const tt=document.getElementById('tokTrack'); tt.innerHTML='';
+  batch.forEach(it=>{
+    const w=Math.max(it.tokens/P.tok*100,0.4);
+    const s=document.createElement('div'); s.className='seg '+it.type;
+    s.style.width=w+'%'; s.style.background=col(it.r.id); s.title=`R${it.r.id} ${it.type} · ${it.tokens} tok`;
+    if(w>4) s.textContent='R'+it.r.id; tt.appendChild(s);
+  });
+  document.getElementById('tokUsed').textContent=last?last.tokensUsed:0;
+
+  // seq slots
+  const ss=document.getElementById('seqSlots'); ss.innerHTML='';
+  for(let i=0;i<P.seq;i++){
+    const it=batch[i], d=document.createElement('div');
+    if(it){ d.className='slot'; d.style.background=col(it.r.id); d.textContent=(it.type==='prefill'?'P':'D')+it.r.id; d.title=`R${it.r.id} · ${it.type}`; }
+    else d.className='slot empty';
+    ss.appendChild(d);
+  }
+  document.getElementById('seqUsed').textContent=last?last.seqsUsed:0;
+
+  // KV bar
+  const kt=document.getElementById('kvTrack'); kt.innerHTML='';
+  resident().sort(prio).forEach(r=>{
+    const blk=blocksOf(r); if(blk<=0) return;
+    const w=blk/P.blocks*100;
+    const s=document.createElement('div'); s.className='seg';
+    s.style.width=w+'%'; s.style.background=col(r.id); s.title=`R${r.id}: ${blk} blocks (ctx ${ctxLen(r)})`;
+    if(w>5) s.textContent='R'+r.id+'·'+blk; kt.appendChild(s);
+  });
+  document.getElementById('kvUsed').textContent=usedBlocks();
+  document.getElementById('kvFree').textContent=freeBlocks();
+
+  // binding badge
+  const bd=document.getElementById('binding');
+  if(!last){ bd.innerHTML='<span class="why">点击 Step 开始调度。</span>'; }
+  else {
+    let html='';
+    if(last.binding==='tok'&&last.hol) html='<span class="tag hol">HOL block</span><span class="why">R'+last.hol+' 的 prompt 超过 token 预算且不可分割,FIFO 下堵死队列。开 chunked prefill 即分块。</span>';
+    else if(last.binding==='tok') html='<span class="tag tok">token-bound</span><span class="why">token 预算用尽 → 提高 <b style="color:var(--tok)">max_num_batched_tokens</b> 才能多塞 prefill。</span>';
+    else if(last.binding==='seq') html='<span class="tag seq">seq-bound</span><span class="why">序列槽占满 → 提高 <b style="color:var(--seq)">max_num_seqs</b>(decode 阶段典型瓶颈)。</span>';
+    else if(last.binding==='kv') html='<span class="tag kv">KV-bound</span><span class="why">物理 KV 块不足,新 prefill 无法分配,需等运行序列完成释放块,或增大 <b style="color:var(--kv)">num_gpu_blocks</b>。</span>';
+    else html='<span class="tag none">fits</span><span class="why">三个预算均未打满,当前负载装得下。</span>';
+    if(last.preempts) html+='<span class="tag pe">⟲ '+last.preempts+' preempt</span>';
+    if(last.aborts.length) html+='<span class="tag pe">✗ '+last.aborts.length+' abort</span>';
+    bd.innerHTML=html;
+  }
+
+  // queues
+  const qw=document.getElementById('qWait'); qw.innerHTML='';
+  const waitNow=reqs.filter(r=>(r.state==='waiting'&&r.arrival<=iter)||r.state==='prefilling').sort(prio);
+  const future=reqs.filter(r=>r.state==='waiting'&&r.arrival>iter).sort(prio);
+  if(!waitNow.length&&!future.length) qw.innerHTML='<div class="empty-note">— empty —</div>';
+  waitNow.forEach(r=>qw.appendChild(chip(r,'wait')));
+  future.forEach(r=>qw.appendChild(chip(r,'future')));
+
+  const qr=document.getElementById('qRun'); qr.innerHTML='';
+  const run=reqs.filter(r=>r.state==='running').sort(prio);
+  if(!run.length) qr.innerHTML='<div class="empty-note">— none —</div>';
+  run.forEach(r=>qr.appendChild(chip(r,'run')));
+
+  // stats
+  const fin=reqs.filter(r=>r.state==='finished'&&!r.aborted).length;
+  const ab=reqs.filter(r=>r.aborted).length;
+  const pe=reqs.reduce((s,r)=>s+(r.preemptions||0),0);
+  document.getElementById('stFin').textContent=fin;
+  document.getElementById('stTot').textContent=reqs.length;
+  document.getElementById('stGen').textContent=reqs.reduce((s,r)=>s+r.generated,0);
+  document.getElementById('stQ').textContent=waitNow.length;
+  document.getElementById('stPe').textContent=pe;
+  document.getElementById('stAb').textContent=ab;
+  document.getElementById('bStep').disabled=reqs.every(r=>r.state==='finished');
+}
+
+function chip(r,kind){
+  const c=document.createElement('div'); c.className='chip'+(kind==='future'?' future':'');
+  const dot=`<span class="dot" style="background:${col(r.id)}"></span>`;
+  const peBadge = r.preemptions ? `<span class="badge b-pe">⟲ preempted ×${r.preemptions}</span>` : '';
+  if(kind==='wait'){
+    const target=r.prompt+r.generated, pct=target?r.prefilled/target*100:0;
+    const lbl=r.state==='prefilling'?'prefilling':'prefill';
+    const meta = r.generated>0 ? `re-prefill ${r.prefilled}/${target} (prompt+gen)` : `prompt ${r.prompt}`;
+    c.innerHTML=`${dot}<span class="id">R${r.id}</span><span class="badge b-pf">${lbl}</span>${peBadge}<span class="meta">${meta}</span>`+
+      `<span class="pbar"><i style="width:${pct}%;background:${col(r.id)}"></i></span>`;
+  } else if(kind==='future'){
+    c.innerHTML=`${dot}<span class="id">R${r.id}</span><span class="meta">arrives @ step ${r.arrival}</span><span class="meta">prompt ${r.prompt}</span>`;
+  } else {
+    const pct=r.generated/r.gen*100;
+    c.innerHTML=`${dot}<span class="id">R${r.id}</span><span class="badge b-de">decode</span>${peBadge}`+
+      `<span class="meta">${r.generated}/${r.gen} tok · ${blocksOf(r)} blk</span>`+
+      `<span class="pbar"><i style="width:${pct}%;background:${col(r.id)}"></i></span>`;
+  }
+  return c;
+}
+
+// wiring
+const $=id=>document.getElementById(id);
+$('sTok').oninput=e=>{P.tok=+e.target.value;$('vTok').textContent=P.tok;render();};
+$('sSeq').oninput=e=>{P.seq=+e.target.value;$('vSeq').textContent=P.seq;render();};
+$('sKv').oninput=e=>{P.blocks=+e.target.value;$('vKv').textContent=P.blocks;render();};
+$('sBs').onchange=e=>{P.B=+e.target.value;$('vBs').textContent=P.B;render();};
+$('cChunk').onchange=e=>{P.chunked=e.target.checked;};
+$('bStep').onclick=()=>{stopTimer();playing=false;$('bPlay').textContent='⏵ Play';step();};
+$('bReset').onclick=reset;
+$('bPlay').onclick=function(){
+  playing=!playing;
+  if(playing){ this.textContent='⏸ Pause'; step(); timer=setInterval(step,950); }
+  else { this.textContent='⏵ Play'; stopTimer(); }
+};
+reset();
+</script>
+</body>
+</html>
